@@ -1,7 +1,7 @@
 ---
 title: Pandoc Comment Filter
 author: bwhelm
-draft: false
+draft: true
 ...
 
 This is a Pandoc filter to extend the use of RawInline and RawBlocks to
@@ -30,14 +30,16 @@ Here is normal text.
 
 <!comment>
 
-This commented text will not appear in non-draft versions.
+This commented text will appear in red in draft versions, but will not
+appear in non-draft versions.
 
-- Bulleted lists work just fine. - So do numbered lists, etc.
+- Bulleted lists work just fine. 
+- So do numbered lists, etc.
 
 <!highlight>
 
-This highlighted text will appear in a different color in draft mode,
-but in standard black in non-draft versions.
+This highlighted text will appear in magenta in draft mode, but in
+standard black in non-draft versions.
 
 <!end>
 
@@ -57,10 +59,10 @@ look at the raw version of this README.
 
 ### Examples
 
-Here is some example text complete with <highlight>highlighted text
-<comment>and with commented text<end>.<margin>Margin note.<end> For
-details of pandoc’s version of markdown syntax, see <fixref>[this
-link](http://pandoc.org)<end>.
+Here is some example text complete with <highlight>highlighted text (in
+magenta)<comment> and with commented text  (in red)<end>.<margin>This is
+a margin note (in red).<end> For details of pandoc’s version of markdown
+syntax, see <fixref>[this link](http://pandoc.org)<end>.
 
 Note that block elements and inline elements can be combined, and that
 other markdown syntax can be used within all comment types as follows.

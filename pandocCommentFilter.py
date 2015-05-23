@@ -103,7 +103,7 @@ def handle_comments(key, value, format, meta):
 				return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + '; ' + marginStyle + '">')
 			else: return []
 		
-		if tag == '<comment>':
+		elif tag == '<comment>':
 			inlineStatus = tag
 			if not draft: return [] # If not draft, then ignore
 			elif format == 'latex':
@@ -112,7 +112,7 @@ def handle_comments(key, value, format, meta):
 				return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + ';">')
 			else: return []
 		
-		if tag == '<fixref>':
+		elif tag == '<fixref>':
 			inlineStatus = tag
 			if not draft: return[]
 			elif format == 'latex':
@@ -121,7 +121,7 @@ def handle_comments(key, value, format, meta):
 				return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + '; ' + marginStyle + '">Fix ref!</span><span style="color: ' + colors[inlineStatus] + ';">')
 			else: return []
 		
-		if tag == '<highlight>':
+		elif tag == '<highlight>':
 			inlineStatus = tag
 			if draft:
 				if format == 'latex':
@@ -131,7 +131,7 @@ def handle_comments(key, value, format, meta):
 				else: return []
 			else: return []
 		
-		if tag == '<end>':
+		elif tag == '<end>':
 			inlineStatus = tag
 			if not draft: return []
 			elif format == 'latex':
