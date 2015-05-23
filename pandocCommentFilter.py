@@ -34,7 +34,7 @@ colors = {	'<!comment>': 'red',
 			'<!end>': 'black', 
 			'<end>': 'black'
 			}
-marginStyle = 'max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;'
+marginStyle = 'max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;' # HTML style for margin notes
 
 def latex(text):
 	return RawInline('latex', text)
@@ -69,20 +69,11 @@ def handle_comments(key, value, format, meta):
 		type, tag = value
 		tag = tag.lower()
 		if type == 'html':
-			if tag == '<!comment>':
+			if tag in ['<!comment>', '<!highlight>']:
 				blockStatus = tag
 				blockColor = colors[blockStatus]
 				if not draft: return []
 				elif format == 'latex':
-					return Para([latex('\\color{' + blockColor + '}{}')])
-				elif format == 'html':
-					return Plain([html(closeHtmlDiv(oldBlockStatus) + '<div style="color: ' + blockColor + ';">')])
-				else: return []
-			elif tag == '<!highlight>':
-				blockStatus = tag
-				blockColor = colors[blockStatus]
-				if not draft: return []
-				elif format == 'latex': 
 					return Para([latex('\\color{' + blockColor + '}{}')])
 				elif format == 'html':
 					return Plain([html(closeHtmlDiv(oldBlockStatus) + '<div style="color: ' + blockColor + ';">')])
@@ -121,6 +112,15 @@ def handle_comments(key, value, format, meta):
 				return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + ';">')
 			else: return []
 		
+		if tag == '<fixref>':
+			inlineStatus = tag
+			if not draft: return[]
+			elif format == 'latex':
+				return latex('\\marginpar{\\footnotesize{\\color{' + colors[inlineStatus] + '}{}Fix ref!}}\\color{' + colors[inlineStatus] + '}{}')
+			elif format == 'html': 
+				return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + '; ' + marginStyle + '">Fix ref!</span><span style="color: ' + colors[inlineStatus] + ';">')
+			else: return []
+		
 		if tag == '<highlight>':
 			inlineStatus = tag
 			if draft:
@@ -130,15 +130,6 @@ def handle_comments(key, value, format, meta):
 					return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + ';">')
 				else: return []
 			else: return []
-		
-		if tag == '<fixref>':
-			inlineStatus = tag
-			if draft: 
-				if format == 'latex':
-					return latex('\\marginpar{\\footnotesize{\\color{' + colors[inlineStatus] + '}{}Fix ref!}}\\color{' + colors[inlineStatus] + '}{}')
-				elif format == 'html': 
-					return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + '; ' + marginStyle + '">Fix ref!</span><span style="color: ' + colors[inlineStatus] + ';">')
-			else: return
 		
 		if tag == '<end>':
 			inlineStatus = tag
