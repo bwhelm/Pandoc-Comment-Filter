@@ -18,6 +18,29 @@ Copyright (C) 2015 Bennett Helm
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
+Syntax Extensions
+-----------------
+
+Block-Level Items:
+
+`<!comment>`: begin comment block
+`<!highlight>`: begin highlight block
+`<!end>`: end comment/highlight blocks
+`<center>`: begin centering
+`</center>`: end centering
+
+
+Inline Items:
+
+`<comment>`: begin commenting
+`<highlight>`: begin highlighting
+`<fixref>`: begin Fix Ref margin note (and highlighting)
+`<end>`: end the above (return to black text)
+`<margin>`: begin margin note
+`</margin>`: end margin note
+
+
 '''
 
 from pandocfilters import toJSONFilter, RawInline, Para, Plain
@@ -29,12 +52,14 @@ colors = {	'<!comment>': 'red',
 			'<comment>': 'red', 
 			'<!highlight>': 'magenta', 
 			'<highlight>': 'magenta',
-			'<margin>': 'red',
+			'<margin>': 'green',
 			'<fixref>': 'cyan',
 			'<!end>': 'black', 
 			'<end>': 'black'
 			}
 marginStyle = 'max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;' # HTML style for margin notes
+
+marginStatus = False # Whether currently in a margin note or not
 
 def latex(text):
 	return RawInline('latex', text)
@@ -51,7 +76,7 @@ def closeHtmlDiv(oldBlockStatus):
 	else: return ''
 
 def handle_comments(key, value, format, meta):
-	global blockStatus, blockColor, inlineStatus
+	global blockStatus, blockColor, inlineStatus, marginStatus
 	
 	# If translating to markdown, leave everything alone.
 	if format == 'markdown': return
@@ -78,6 +103,7 @@ def handle_comments(key, value, format, meta):
 				elif format == 'html':
 					return Plain([html(closeHtmlDiv(oldBlockStatus) + '<div style="color: ' + blockColor + ';">')])
 				else: return []
+				
 			elif tag == '<!end>':
 				blockStatus = tag
 				blockColor = colors[blockStatus]
@@ -88,6 +114,7 @@ def handle_comments(key, value, format, meta):
 					return Plain([html('</div>')])
 				else: return []
 
+
 	# Then check to see if we're changing inlineStatus...
 	elif key == 'RawInline':
 		type, tag = value
@@ -95,12 +122,12 @@ def handle_comments(key, value, format, meta):
 		tag = tag.lower()
 		
 		if tag == '<margin>':
-			inlineStatus = tag
+			marginStatus = True
 			if not draft: return []
 			elif format == 'latex':
-				return latex('\\marginpar{\\footnotesize{\\color{' + colors[inlineStatus] + '}{}')
+				return latex('\\marginpar{\\footnotesize{\\color{' + colors[tag] + '}{}')
 			elif format == 'html':
-				return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + '; ' + marginStyle + '">')
+				return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[tag] + '; ' + marginStyle + '">')
 			else: return []
 		
 		elif tag == '<comment>':
@@ -134,12 +161,17 @@ def handle_comments(key, value, format, meta):
 		elif tag == '<end>':
 			inlineStatus = tag
 			if not draft: return []
-			elif format == 'latex':
-				if oldInlineStatus == '<margin>': return latex('\\color{' + colors[inlineStatus] + '}}}')
+			elif format == 'latex': 
+				if marginStatus: return latex('\\color{' + colors['<margin>'] + '}{}')
 				else: return latex('\\color{' + blockColor + '}{}')
-			elif format == 'html':
-				return html('</span>')
-	
+			elif format == 'html': return html('</span>')
+		
+		elif tag == '</margin>':
+			marginStatus = False
+			if not draft: return []
+			elif format == 'latex': return latex('\\color{' + colors[inlineStatus] + '}}}')
+			elif format == 'html': return html('</span>')
+		
 	# Finally, if we're not in draft mode and we're reading a block comment or 
 	# an inline comment or margin note, then suppress output.
 	elif blockStatus in ['<!comment>'] and not draft: return []

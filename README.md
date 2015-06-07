@@ -47,11 +47,11 @@ Now we are back to normal text.
 
 ## Inline Elements:
 
-Use `<comment>` or `<highlight>` or `<fixref>` or `<margin>` to begin,
-and `<end>` to end inline comments. These can be in paragraphs on their
-own, or they can be part of an existing paragraph. `<comment>`,
-`<highlight>`, and `<fixref>` can be followed by each other (but not by
-`<margin>`), but eventually must be followed by `<end>`.
+Use `<comment>` or `<highlight>` or `<fixref>` to begin, and `<end>` to
+end inline comments. `<comment>`, `<highlight>`, and `<fixref>` can be
+followed by each other, but eventually must be followed by `<end>`.
+
+Use `<margin>` to begin and `</margin>` to end a marginal note.
 
 **NOTE:** github’s version of markdown does not display the custom
 inline comment markup. To see the syntax of inline examples, you need to
@@ -61,7 +61,7 @@ look at the raw version of this README.
 
 Here is some example text complete with <highlight>highlighted text (in
 magenta)<comment> and with commented text  (in red)<end>.<margin>This is
-a margin note (in red).<end> For details of pandoc’s version of markdown
+a margin note (in green).</margin> For details of pandoc’s version of markdown
 syntax, see <fixref>[this link](http://pandoc.org)<end>.
 
 Note that block elements and inline elements can be combined, and that
@@ -70,7 +70,9 @@ other markdown syntax can be used within all comment types as follows.
 <!comment>
 
 This is commented text.<margin>And here is a `margin` note, with
-*emphasis*.<end> This is <highlight>highlighted and *italic*<end> text.
+*emphasis*. Marginal notes can also contain <comment>commented text<end>
+and back to normal margin color.</margin> This is <highlight>highlighted
+and *italic*<end> text. But now should be back to commented text.
 
 <!end>
 
