@@ -41,6 +41,13 @@ Inline Items:
 `</margin>`: end margin note
 
 
+Other Items:
+
+`< `: do not indent paragraph (used after quotation block)
+`<l LABEL>`: create a label
+`<r LABEL>`: create a reference
+`<rp LABEL>`: create a page reference
+
 '''
 
 from pandocfilters import toJSONFilter, RawInline, Para, Plain
@@ -113,7 +120,15 @@ def handle_comments(key, value, format, meta):
 				elif format == 'html':
 					return Plain([html('</div>')])
 				else: return []
-
+				
+			elif tag == '<center>':
+				if format == 'latex': return Para([latex('\\begin{center}')])
+				elif format == 'html': return
+		
+			elif tag == '</center>':
+				if format == 'latex': return Para([latex('\\end{center}')])
+				elif format == 'html': return
+		
 
 	# Then check to see if we're changing inlineStatus...
 	elif key == 'RawInline':
@@ -171,7 +186,30 @@ def handle_comments(key, value, format, meta):
 			if not draft: return []
 			elif format == 'latex': return latex('\\color{' + colors[inlineStatus] + '}}}')
 			elif format == 'html': return html('</span>')
-		
+				
+		elif tag.startswith('<l ') and tag.endswith('>'): # My definition of a label
+			label = tag[3:-1]
+			if format == 'latex': return latex('\\label{' + label + '}')
+			elif format == 'html': return html('<a name="' + label + '">')
+		elif tag.startswith('<r ') and tag.endswith('>'): # My definition of a reference
+			label = tag[3:-1]
+			if format == 'latex': return latex('\\autoref{' + label + '}')
+			elif format == 'html': return html('<a href="#' + label + '">here</a>')
+		elif tag.startswith('<rp ') and tag.endswith('>'): # My definition of a page reference
+			label = tag[4:-1]
+			if format == 'latex': return latex('page~\\pageref{' + label + '}')
+			elif format == 'html': return html('<a href="#' + label + '">here</a>')
+			
+	
+	# If translating to LaTeX, beginning a paragraph with '<' will cause 
+	# '\noindent{}' to be output first.
+	elif key == 'Para':
+		try:
+			if value[0]['t'] == 'Str' and value[0]['c'] == '<' and value[1]['t'] == 'Space': 
+				if format == 'latex': return Para([latex('\\noindent{}')] + value[2:])
+				else: return Para(value[2:])
+		except: pass # May happen if the paragraph is empty.
+	
 	# Finally, if we're not in draft mode and we're reading a block comment or 
 	# an inline comment or margin note, then suppress output.
 	elif blockStatus in ['<!comment>'] and not draft: return []
