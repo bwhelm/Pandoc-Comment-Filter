@@ -213,7 +213,8 @@ def handle_comments(key, value, format, meta):
 	# Finally, if we're not in draft mode and we're reading a block comment or 
 	# an inline comment or margin note, then suppress output.
 	elif blockStatus in ['<!comment>'] and not draft: return []
-	elif inlineStatus in ['<comment>', '<margin>'] and not draft: return []
+	elif inlineStatus in ['<comment>'] and not draft: return []
+	elif marginStatus and not draft: return[]
 
 
 if __name__ == "__main__":
