@@ -52,7 +52,7 @@ colors = {	'<!comment>': 'red',
 			'<comment>': 'red', 
 			'<!highlight>': 'magenta', 
 			'<highlight>': 'magenta',
-			'<margin>': 'green',
+			'<margin>': 'red',
 			'<fixref>': 'cyan',
 			'<!end>': 'black', 
 			'<end>': 'black'
