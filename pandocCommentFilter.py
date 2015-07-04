@@ -50,7 +50,16 @@ Other Items:
 
 '''
 
-from pandocfilters import toJSONFilter, RawInline, Para, Plain
+from pandocfilters import toJSONFilter, RawInline, Para, Plain, Image, Str
+from os import path, mkdir, chdir, getcwd
+from shutil import copyfile, rmtree
+from sys import getfilesystemencoding, stderr
+from tempfile import mkdtemp
+from subprocess import call
+from hashlib import sha1
+
+TEMP_PATH = '/Users/bennett/tmp/pandoc/'
+IMAGE_DIR = path.join(TEMP_PATH, 'Figures')
 
 blockStatus = '<!end>'
 blockColor = 'black'
@@ -67,6 +76,29 @@ colors = {	'<!comment>': 'red',
 marginStyle = 'max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;' # HTML style for margin notes
 
 marginStatus = False # Whether currently in a margin note or not
+
+def my_sha1(x):
+	return sha1(x.encode(getfilesystemencoding())).hexdigest()
+
+def tikz2image(tikz, filetype, outfile):
+	tmpdir = mkdtemp()
+	olddir = getcwd()
+	chdir(tmpdir)
+	f = open('tikz.tex', 'w')
+	f.write('\\documentclass{standalone}\n\\usepackage{tikz}\n\\begin{document}\n')
+	f.write(tikz)
+	f.write('\n\\end{document}\n')
+	f.close()
+	p = call(['pdflatex', 'tikz.tex'], stdout=stderr)
+	chdir(olddir)
+	if filetype == 'pdf':
+		copyfile(path.join(tmpdir, 'tikz.pdf'), outfile + '.' + filetype)
+	else:
+		call(['convert', path.join(tmpdir, 'tikz.pdf'), outfile + '.' + filetype])
+	rmtree(tmpdir)
+
+def copyImage(image, format):
+	return image
 
 def latex(text):
 	return RawInline('latex', text)
@@ -199,7 +231,7 @@ def handle_comments(key, value, format, meta):
 			label = tag[4:-1]
 			if format == 'latex': return latex('page~\\pageref{' + label + '}')
 			elif format == 'html': return html('<a href="#' + label + '">here</a>')
-			
+	
 	
 	# If translating to LaTeX, beginning a paragraph with '<' will cause 
 	# '\noindent{}' to be output first.
@@ -209,6 +241,39 @@ def handle_comments(key, value, format, meta):
 				if format == 'latex': return Para([latex('\\noindent{}')] + value[2:])
 				else: return Para(value[2:])
 		except: pass # May happen if the paragraph is empty.
+	
+	
+	# Check for tikz CodeBlock. If it exists, try typesetting figure
+	elif key == 'CodeBlock':
+		(id, classes, attributes), code = value
+		if 'tikz' in classes or '\\begin{tikzpicture}' in code:
+			outfile = path.join(IMAGE_DIR, my_sha1(code))
+			if format == 'html': filetype = 'png'
+			if format == 'latex': filetype = 'pdf'
+			else: filetype = 'png'
+			sourceFile = outfile + '.' + filetype
+			if not path.isfile(sourceFile):
+				try:
+					mkdir(IMAGE_DIR)
+					stderr.write('Created directory ' + IMAGE_DIR + '\n')
+				except OSError: pass
+				tikz2image(code, filetype, outfile)
+				stderr.write('Created image ' + sourceFile + '\n')
+			caption = ''
+			for a, b in attributes:
+				if a == 'caption':
+					caption = b
+					break
+			return Para([Image([Str(caption)], [sourceFile, caption])])
+
+	
+	# Check for images and copy/convert to IMAGE_DIR
+	elif key == 'Image':
+		caption, file = value
+		sourceFile, label = file
+		image = copyImage(sourceFile, format)
+		return Image(caption, [image, label])
+	
 	
 	# Finally, if we're not in draft mode and we're reading a block comment or 
 	# an inline comment or margin note, then suppress output.
