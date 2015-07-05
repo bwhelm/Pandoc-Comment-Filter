@@ -19,10 +19,9 @@ Copyright (C) 2015 Bennett Helm
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-Syntax Extensions
------------------
+# Syntax Extensions
 
-Block-Level Items:
+## Block-Level Items:
 
 `<!comment>`: begin comment block
 `<!highlight>`: begin highlight block
@@ -31,7 +30,7 @@ Block-Level Items:
 `</center>`: end centering
 
 
-Inline Items:
+## Inline Items:
 
 `<comment>`: begin commenting
 `<highlight>`: begin highlighting
@@ -41,12 +40,21 @@ Inline Items:
 `</margin>`: end margin note
 
 
-Other Items:
+## Other Items:
 
 `< `: do not indent paragraph (used after quotation block)
 `<l LABEL>`: create a label
 `<r LABEL>`: create a reference
 `<rp LABEL>`: create a page reference
+
+
+## Images: Allow for tikZ figures in code blocks. They should have the following format:
+
+~~~ {#tikz caption='Caption' id='fig:id' tikzlibrary='items,to,go,in,\\usetikzlibrary{}'}
+
+[LaTeX code]
+
+~~~
 
 '''
 
@@ -79,12 +87,14 @@ marginStatus = False # Whether currently in a margin note or not
 def my_sha1(x):
 	return sha1(x.encode(getfilesystemencoding())).hexdigest()
 
-def tikz2image(tikz, filetype, outfile):
+def tikz2image(tikz, filetype, outfile, library):
 	tmpdir = mkdtemp()
 	olddir = getcwd()
 	chdir(tmpdir)
 	f = open('tikz.tex', 'w')
-	f.write('\\documentclass{standalone}\n\\usepackage{tikz}\n\\begin{document}\n')
+	f.write('\\documentclass{standalone}\n\\usepackage{tikz}\n')
+	if library: f.write('\\usetikzlibrary{' + library + '}\n')
+	f.write('\\begin{document}\n')
 	f.write(tikz)
 	f.write('\n\\end{document}\n')
 	f.close()
@@ -248,19 +258,24 @@ def handle_comments(key, value, format, meta):
 			if format == 'latex': filetype = 'pdf'
 			else: filetype = 'png'
 			sourceFile = outfile + '.' + filetype
+			caption = ''
+			id = ''
+			library = ''
+			for a, b in attributes:
+				if a == 'caption': caption = b
+				elif a == 'id': id = '{#' + b + '}'
+				elif a == 'tikzlibrary': library = b
 			if not path.isfile(sourceFile):
 				try:
 					mkdir(IMAGE_PATH)
 					stderr.write('Created directory ' + IMAGE_PATH + '\n')
 				except OSError: pass
-				tikz2image(code, filetype, outfile)
+				tikz2image(code, filetype, outfile, library)
 				stderr.write('Created image ' + sourceFile + '\n')
-			caption = ''
-			for a, b in attributes:
-				if a == 'caption':
-					caption = b
-					break
-			return Para([Image([Str(caption)], [sourceFile, caption])])
+			if id:
+				return Para([Image([Str(caption)], [sourceFile, caption]), Str(id)])
+			else:
+				return Para([Image([Str(caption)], [sourceFile, caption])])
 
 	
 	# Check for images and copy/convert to IMAGE_PATH
