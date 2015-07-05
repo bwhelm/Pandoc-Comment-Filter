@@ -58,8 +58,7 @@ from tempfile import mkdtemp
 from subprocess import call
 from hashlib import sha1
 
-TEMP_PATH = '/Users/bennett/tmp/pandoc/'
-IMAGE_DIR = path.join(TEMP_PATH, 'Figures')
+IMAGE_PATH = '/Users/bennett/tmp/pandoc/Figures'
 
 blockStatus = '<!end>'
 blockColor = 'black'
@@ -96,9 +95,6 @@ def tikz2image(tikz, filetype, outfile):
 	else:
 		call(['convert', path.join(tmpdir, 'tikz.pdf'), outfile + '.' + filetype])
 	rmtree(tmpdir)
-
-def copyImage(image, format):
-	return image
 
 def latex(text):
 	return RawInline('latex', text)
@@ -247,15 +243,15 @@ def handle_comments(key, value, format, meta):
 	elif key == 'CodeBlock':
 		(id, classes, attributes), code = value
 		if 'tikz' in classes or '\\begin{tikzpicture}' in code:
-			outfile = path.join(IMAGE_DIR, my_sha1(code))
+			outfile = path.join(IMAGE_PATH, my_sha1(code))
 			if format == 'html': filetype = 'png'
 			if format == 'latex': filetype = 'pdf'
 			else: filetype = 'png'
 			sourceFile = outfile + '.' + filetype
 			if not path.isfile(sourceFile):
 				try:
-					mkdir(IMAGE_DIR)
-					stderr.write('Created directory ' + IMAGE_DIR + '\n')
+					mkdir(IMAGE_PATH)
+					stderr.write('Created directory ' + IMAGE_PATH + '\n')
 				except OSError: pass
 				tikz2image(code, filetype, outfile)
 				stderr.write('Created image ' + sourceFile + '\n')
@@ -267,12 +263,13 @@ def handle_comments(key, value, format, meta):
 			return Para([Image([Str(caption)], [sourceFile, caption])])
 
 	
-	# Check for images and copy/convert to IMAGE_DIR
-	elif key == 'Image':
-		caption, file = value
-		sourceFile, label = file
-		image = copyImage(sourceFile, format)
-		return Image(caption, [image, label])
+	# Check for images and copy/convert to IMAGE_PATH
+# 	elif key == 'Image':
+# 		c, f = value
+# 		caption = c[0]['c']
+# 		imageFile, label = f
+# 		newImageFile = copyImage(imageFile, format)
+# 		return Image([Str(caption)], [newImageFile, label])
 	
 	
 	# Finally, if we're not in draft mode and we're reading a block comment or 
