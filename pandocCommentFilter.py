@@ -19,10 +19,9 @@ Copyright (C) 2015 Bennett Helm
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-Syntax Extensions
------------------
+# Syntax Extensions
 
-Block-Level Items:
+## Block-Level Items:
 
 `<!comment>`: begin comment block
 `<!highlight>`: begin highlight block
@@ -31,7 +30,7 @@ Block-Level Items:
 `</center>`: end centering
 
 
-Inline Items:
+## Inline Items:
 
 `<comment>`: begin commenting
 `<highlight>`: begin highlighting
@@ -41,16 +40,33 @@ Inline Items:
 `</margin>`: end margin note
 
 
-Other Items:
+## Other Items:
 
 `< `: do not indent paragraph (used after quotation block)
 `<l LABEL>`: create a label
 `<r LABEL>`: create a reference
 `<rp LABEL>`: create a page reference
 
+
+## Images: Allow for tikZ figures in code blocks. They should have the following format:
+
+~~~ {#tikz caption='Caption' id='fig:id' tikzlibrary='items,to,go,in,\\usetikzlibrary{}'}
+
+[LaTeX code]
+
+~~~
+
 '''
 
-from pandocfilters import toJSONFilter, RawInline, Para, Plain
+from pandocfilters import toJSONFilter, RawInline, Para, Plain, Image, Str
+from os import path, mkdir, chdir, getcwd
+from shutil import copyfile, rmtree
+from sys import getfilesystemencoding, stderr
+from tempfile import mkdtemp
+from subprocess import call
+from hashlib import sha1
+
+IMAGE_PATH = '/Users/bennett/tmp/pandoc/Figures'
 
 blockStatus = '<!end>'
 blockColor = 'black'
@@ -67,6 +83,28 @@ colors = {	'<!comment>': 'red',
 marginStyle = 'max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;' # HTML style for margin notes
 
 marginStatus = False # Whether currently in a margin note or not
+
+def my_sha1(x):
+	return sha1(x.encode(getfilesystemencoding())).hexdigest()
+
+def tikz2image(tikz, filetype, outfile, library):
+	tmpdir = mkdtemp()
+	olddir = getcwd()
+	chdir(tmpdir)
+	f = open('tikz.tex', 'w')
+	f.write('\\documentclass{standalone}\n\\usepackage{tikz}\n')
+	if library: f.write('\\usetikzlibrary{' + library + '}\n')
+	f.write('\\begin{document}\n')
+	f.write(tikz)
+	f.write('\n\\end{document}\n')
+	f.close()
+	p = call(['pdflatex', 'tikz.tex'], stdout=stderr)
+	chdir(olddir)
+	if filetype == 'pdf':
+		copyfile(path.join(tmpdir, 'tikz.pdf'), outfile + '.' + filetype)
+	else:
+		call(['convert', path.join(tmpdir, 'tikz.pdf'), outfile + '.' + filetype])
+	rmtree(tmpdir)
 
 def latex(text):
 	return RawInline('latex', text)
@@ -199,7 +237,7 @@ def handle_comments(key, value, format, meta):
 			label = tag[4:-1]
 			if format == 'latex': return latex('page~\\pageref{' + label + '}')
 			elif format == 'html': return html('<a href="#' + label + '">here</a>')
-			
+	
 	
 	# If translating to LaTeX, beginning a paragraph with '<' will cause 
 	# '\noindent{}' to be output first.
@@ -209,6 +247,45 @@ def handle_comments(key, value, format, meta):
 				if format == 'latex': return Para([latex('\\noindent{}')] + value[2:])
 				else: return Para(value[2:])
 		except: pass # May happen if the paragraph is empty.
+	
+	
+	# Check for tikz CodeBlock. If it exists, try typesetting figure
+	elif key == 'CodeBlock':
+		(id, classes, attributes), code = value
+		if 'tikz' in classes or '\\begin{tikzpicture}' in code:
+			outfile = path.join(IMAGE_PATH, my_sha1(code))
+			if format == 'html': filetype = 'png'
+			if format == 'latex': filetype = 'pdf'
+			else: filetype = 'png'
+			sourceFile = outfile + '.' + filetype
+			caption = ''
+			id = ''
+			library = ''
+			for a, b in attributes:
+				if a == 'caption': caption = b
+				elif a == 'id': id = '{#' + b + '}'
+				elif a == 'tikzlibrary': library = b
+			if not path.isfile(sourceFile):
+				try:
+					mkdir(IMAGE_PATH)
+					stderr.write('Created directory ' + IMAGE_PATH + '\n')
+				except OSError: pass
+				tikz2image(code, filetype, outfile, library)
+				stderr.write('Created image ' + sourceFile + '\n')
+			if id:
+				return Para([Image([Str(caption)], [sourceFile, caption]), Str(id)])
+			else:
+				return Para([Image([Str(caption)], [sourceFile, caption])])
+
+	
+	# Check for images and copy/convert to IMAGE_PATH
+# 	elif key == 'Image':
+# 		c, f = value
+# 		caption = c[0]['c']
+# 		imageFile, label = f
+# 		newImageFile = copyImage(imageFile, format)
+# 		return Image([Str(caption)], [newImageFile, label])
+	
 	
 	# Finally, if we're not in draft mode and we're reading a block comment or 
 	# an inline comment or margin note, then suppress output.
