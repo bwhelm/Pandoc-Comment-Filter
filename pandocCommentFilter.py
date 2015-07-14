@@ -23,7 +23,7 @@ Copyright (C) 2015 Bennett Helm
 
 ## Block-Level Items:
 
-`<!comment>`: begin comment block
+`<!comment>`: begin comment block (or speaker notes for revealjs)
 `<!highlight>`: begin highlight block
 `<!end>`: end comment/highlight blocks
 `<center>`: begin centering
@@ -142,11 +142,13 @@ def handle_comments(key, value, format, meta):
 			if tag in ['<!comment>', '<!highlight>']:
 				blockStatus = tag
 				blockColor = colors[blockStatus]
-				if not draft: return []
+				if not draft and format != 'revealjs': return []
 				elif format == 'latex':
 					return Para([latex('\\color{' + blockColor + '}{}')])
-				elif format == 'html':
+				elif format == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
 					return Plain([html(closeHtmlDiv(oldBlockStatus) + '<div style="color: ' + blockColor + ';">')])
+				elif format == 'revealjs':
+					return Plain([html(closeHtmlDiv(oldBlockStatus) + '<aside class="notes">')])
 				else: return []
 				
 			elif tag == '<!end>':
@@ -157,6 +159,8 @@ def handle_comments(key, value, format, meta):
 					return Para([latex('\\color{' + blockColor + '}{}')])
 				elif format == 'html':
 					return Plain([html('</div>')])
+				elif format == 'revealjs':
+					return Plain([html('</aside>')])
 				else: return []
 				
 			elif tag == '<center>':
@@ -206,7 +210,7 @@ def handle_comments(key, value, format, meta):
 			if draft:
 				if format == 'latex':
 					return latex('\\color{' + colors[inlineStatus] + '}{}')
-				elif format == 'html': 
+				elif format in ['html', 'revealjs']:
 					return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + ';">')
 				else: return []
 			else: return []
@@ -217,7 +221,7 @@ def handle_comments(key, value, format, meta):
 			elif format == 'latex': 
 				if marginStatus: return latex('\\color{' + colors['<margin>'] + '}{}')
 				else: return latex('\\color{' + blockColor + '}{}')
-			elif format == 'html': return html('</span>')
+			elif format in ['html', 'revealjs']: return html('</span>')
 		
 		elif tag == '</margin>':
 			marginStatus = False
@@ -289,7 +293,7 @@ def handle_comments(key, value, format, meta):
 	
 	# Finally, if we're not in draft mode and we're reading a block comment or 
 	# an inline comment or margin note, then suppress output.
-	elif blockStatus in ['<!comment>'] and not draft: return []
+	elif blockStatus in ['<!comment>'] and not draft and format != 'revealjs': return []
 	elif inlineStatus in ['<comment>'] and not draft: return []
 	elif marginStatus and not draft: return[]
 
