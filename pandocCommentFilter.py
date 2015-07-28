@@ -235,11 +235,11 @@ def handle_comments(key, value, format, meta):
 			elif format == 'html': return html('<a name="' + label + '">')
 		elif tag.startswith('<r ') and tag.endswith('>'): # My definition of a reference
 			label = tag[3:-1]
-			if format == 'latex': return latex('\\autoref{' + label + '}')
+			if format == 'latex': return latex('\\cref{' + label + '}')
 			elif format == 'html': return html('<a href="#' + label + '">here</a>')
 		elif tag.startswith('<rp ') and tag.endswith('>'): # My definition of a page reference
 			label = tag[4:-1]
-			if format == 'latex': return latex('page~\\pageref{' + label + '}')
+			if format == 'latex': return latex('\\cpageref{' + label + '}')
 			elif format == 'html': return html('<a href="#' + label + '">here</a>')
 	
 	
