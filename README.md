@@ -19,10 +19,9 @@ effect it has on the final output.
 
 ## Block Elements: 
 
-Use `<!comment>` or `<!highlight>` to begin block, and `<!end>` to end.
+Use `<!comment>` or `<!highlight>` to begin block, and `</!comment>` and `</!highlight>` to end.
 These must be in a line on their own, separated both above and below by
-blank lines. Tags that begin blocks can be followed by other tags that
-begin blocks, but eventually it should be followed by `<!end>`.
+blank lines. Tags may be nested, but the filter will break if they are not nested properly.
 
 ### Example
 
@@ -41,17 +40,18 @@ appear in non-draft versions.
 This highlighted text will appear in magenta in draft mode, but in
 standard black in non-draft versions.
 
-<!end>
+</!highlight>
+
+Back to commented text (in red).
+
+</!comment>
 
 Now we are back to normal text.
 
 ## Inline Elements:
 
-Use `<comment>` or `<highlight>` or `<fixref>` to begin, and `<end>` to
-end inline comments. `<comment>`, `<highlight>`, and `<fixref>` can be
-followed by each other, but eventually must be followed by `<end>`.
-
-Use `<margin>` to begin and `</margin>` to end a marginal note.
+Use `<comment>` or `<highlight>` or `<fixme>` or `<margin>` to begin, and `</comment>`, etc.\ to
+end inline comments. Again, these can be nested, but the filter will fail if they are not nested properly.
 
 **NOTE:** github’s version of markdown does not display the custom
 inline comment markup. To see the syntax of inline examples, you need to
@@ -60,9 +60,9 @@ look at the raw version of this README.
 ### Examples
 
 Here is some example text complete with <highlight>highlighted text (in
-magenta)<comment> and with commented text  (in red)<end>.<margin>This is
-a margin note (in green).</margin> For details of pandoc’s version of markdown
-syntax, see <fixref>[this link](http://pandoc.org)<end>.
+magenta)</highlight> <comment>and with commented text  (in red)</comment>.<margin>This is
+a margin note (in red).</margin> For details of pandoc’s version of markdown
+syntax, see <fixme>[this link](http://pandoc.org)</fixme>.
 
 Note that block elements and inline elements can be combined, and that
 other markdown syntax can be used within all comment types as follows.
@@ -70,9 +70,10 @@ other markdown syntax can be used within all comment types as follows.
 <!comment>
 
 This is commented text.<margin>And here is a `margin` note, with
-*emphasis*. Marginal notes can also contain <comment>commented text<end>
+*emphasis*. Marginal notes can also contain <highlight>highlighted text</highlight>
 and back to normal margin color.</margin> This is <highlight>highlighted
-and *italic*<end> text. But now should be back to commented text.
+and *italic*</highlight> text. But now should be back to commented text.
 
-<!end>
+</!comment>
 
+And now back to normal once again.
