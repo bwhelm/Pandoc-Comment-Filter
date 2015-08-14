@@ -24,8 +24,9 @@ Copyright (C) 2015 Bennett Helm
 ## Block-Level Items:
 
 `<!comment>`: begin comment block (or speaker notes for revealjs)
+`</!comment>`: end comment block (or speaker notes for revealjs)
 `<!highlight>`: begin highlight block
-`<!end>`: end comment/highlight blocks
+`</!highlight>`: end highlight block
 `<center>`: begin centering
 `</center>`: end centering
 
@@ -33,9 +34,11 @@ Copyright (C) 2015 Bennett Helm
 ## Inline Items:
 
 `<comment>`: begin commenting
+`</comment>`: end commenting
 `<highlight>`: begin highlighting
-`<fixref>`: begin Fix Ref margin note (and highlighting)
-`<end>`: end the above (return to black text)
+`</highlight>`: end highlighting
+`<fixme>`: begin FixMe margin note (and highlighting)
+`</fixme>`: end FixMe margin note (and highlighting)
 `<margin>`: begin margin note
 `</margin>`: end margin note
 
@@ -68,21 +71,60 @@ from hashlib import sha1
 
 IMAGE_PATH = '/Users/bennett/tmp/pandoc/Figures'
 
-blockStatus = '<!end>'
-blockColor = 'black'
-inlineStatus = '<end>'
-colors = {	'<!comment>': 'red', 
-			'<comment>': 'red', 
-			'<!highlight>': 'magenta', 
-			'<highlight>': 'magenta',
-			'<margin>': 'red',
-			'<fixref>': 'cyan',
-			'<!end>': 'black', 
-			'<end>': 'black'
-			}
+blockStatus = []
+inlineStatus = []
+
+colors = {
+	'<!comment>': 'red', 
+	'<comment>': 'red', 
+	'<!highlight>': 'magenta', 
+	'<highlight>': 'magenta',
+	'<margin>': 'red',
+	'<fixme>': 'cyan',
+}
+endColor = '\\color{black}{}'
 marginStyle = 'max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;' # HTML style for margin notes
 
+latexText = {
+	'<!comment>': '\\color{' + colors['<!comment>'] + '}{}',
+	'</!comment>': endColor,
+	'<!highlight>': '\\color{' + colors['<!highlight>'] + '}{}',
+	'</!highlight>': endColor,
+	'<comment>': '\\color{' + colors['<comment>'] + '}{}',
+	'</comment>': '',
+	'<highlight>': '\\color{' + colors['<highlight>'] + '}{}',
+	'</highlight>': '',
+	'<margin>': '\\marginpar{\\footnotesize{\\color{' + colors['<margin>'] + '}{}',
+	'</margin>': '}}',
+	'<fixme>': '\\marginpar{\\footnotesize{\\color{' + colors['<fixme>'] + '}{}Fix this!}}\\color{' + colors['<fixme>'] + '}{}',
+	'</fixme>': '',
+	'<center>': '\\begin{center}',
+	'</center>': '\\end{center}',
+	'<end>': endColor
+}
+htmlText = {
+	'<!comment>': '<div style="color: ' + colors['<!comment>'] + ';">',
+	'</!comment>': '</div>',
+	'<!highlight>': '<div style="color: ' + colors['<!highlight>'] + ';">',
+	'</!highlight>': '</div>',
+	'<comment>': '<span style="color: ' + colors['<comment>'] + ';">',
+	'</comment>': '</span>',
+	'<highlight>': '<span style="color: ' + colors['<highlight>'] + ';">',
+	'</highlight>': '</span>',
+	'<margin>': '<span style="color: ' + colors['<margin>'] + '; ' + marginStyle + '">',
+	'</margin>': '</span>',
+	'<fixme>': '<span style="color: ' + colors['<fixme>'] + '; ' + marginStyle + '">Fix this!</span><span style="color: ' + colors['<fixme>'] + ';">',
+	'</fixme>': '</span>',
+	'<center>': '', # TODO Add this!
+	'</center>': '' # TODO Here too!
+}
+revealjsText = {
+	'<!comment>': '<aside class="notes">',
+	'</!comment>': '</aside>'
+}
+
 marginStatus = False # Whether currently in a margin note or not
+# TODO: Get rid of marginStatus (put into inlineStatus)!
 
 def my_sha1(x):
 	return sha1(x.encode(getfilesystemencoding())).hexdigest()
@@ -113,7 +155,7 @@ def html(text):
 	return RawInline('html', text)
 	
 def closeHtmlSpan(oldInlineStatus):
-	if oldInlineStatus in ['<comment>', '<highlight>', '<fixref>']: return '</span>'
+	if oldInlineStatus in ['<comment>', '<highlight>', '<fixme>']: return '</span>'
 	else: return ''
 
 def closeHtmlDiv(oldBlockStatus):
@@ -126,9 +168,8 @@ def handle_comments(key, value, format, meta):
 	# If translating to markdown, leave everything alone.
 	if format == 'markdown': return
 	
-	# Keep track of this for later....
-	oldInlineStatus = inlineStatus
-	oldBlockStatus = blockStatus
+#	# Keep track of this for later....
+	oldInlineStatus = inlineStatus # TODO Delete this line!
 
 	# Get draft status from metadata field (or assume not draft if there's no such field)
 	try: draft = meta['draft']['c']
@@ -137,106 +178,87 @@ def handle_comments(key, value, format, meta):
 	# First check to see if we're changing blockStatus...
 	if key == 'RawBlock':
 		type, tag = value
+		if type != 'html': pass
 		tag = tag.lower()
-		if type == 'html':
-			if tag in ['<!comment>', '<!highlight>']:
-				blockStatus = tag
-				blockColor = colors[blockStatus]
-				if not draft and format != 'revealjs': return []
-				elif format == 'latex':
-					return Para([latex('\\color{' + blockColor + '}{}')])
-				elif format == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
-					return Plain([html(closeHtmlDiv(oldBlockStatus) + '<div style="color: ' + blockColor + ';">')])
-				elif format == 'revealjs':
-					return Plain([html(closeHtmlDiv(oldBlockStatus) + '<aside class="notes">')])
-				else: return []
-				
-			elif tag == '<!end>':
-				blockStatus = tag
-				blockColor = colors[blockStatus]
+		if tag in ['<!comment>', '<!highlight>']:
+			if blockStatus: oldBlockStatus = blockStatus[-1]
+			else: oldBlockStatus = ''
+			blockStatus.append(tag)
+			if not draft and format != 'revealjs': return []
+			elif format == 'latex':
+				return Para([latex(latexText[tag])])
+			elif format == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
+				return Plain([html(closeHtmlDiv(oldBlockStatus) + htmlText[tag])])
+			elif format == 'revealjs': # tag == '<!comment>', so make speaker note
+				return Plain([html(closeHtmlDiv(oldBlockStatus) + revealjsText[tag])])
+			else: return []
+			
+		elif tag in ['</!comment>', '</!highlight>']:
+			currentBlockStatus = blockStatus.pop()
+			if currentBlockStatus[1:] == tag[2:]: # If we have a matching closing tag...
 				if not draft: return []
-				elif format == 'latex':
-					return Para([latex('\\color{' + blockColor + '}{}')])
-				elif format == 'html':
-					return Plain([html('</div>')])
+				if blockStatus: tag = blockStatus[-1] # Switch back to previous
+				if format == 'latex':
+					return Para([latex(latexText[tag])])
+				elif format == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
+					return Plain([html(htmlText[tag])])
 				elif format == 'revealjs':
-					return Plain([html('</aside>')])
+					return Plain([html(revealjsText[tag])])
 				else: return []
-				
-			elif tag == '<center>':
-				if format == 'latex': return Para([latex('\\begin{center}')])
-				elif format == 'html': return
+			else: exit(1) # TODO Is this right?
+			
+		elif tag == '<center>':
+			blockStatus.append(tag)
+			if format in ['latex', 'beamer']: return Para([latex(latexText[tag])])
+			elif format == 'html': return # TODO Fix centering in html
+	
+		elif tag == '</center>':
+			currentBlockStatus = blockStatus.pop()
+			if currentBlockStatus[1:] == tag[2:]:
+				if format in ['latex', 'beamer']: return Para([latex(latexText[tag])])
+				elif format == 'html': return # TODO Fix centering in html
+			else: exit(1) # TODO Is this right?
 		
-			elif tag == '</center>':
-				if format == 'latex': return Para([latex('\\end{center}')])
-				elif format == 'html': return
-		
-
 	# Then check to see if we're changing inlineStatus...
 	elif key == 'RawInline':
 		type, tag = value
 		if type != 'html': pass
 		tag = tag.lower()
 		
-		if tag == '<margin>':
-			marginStatus = True
+		if tag in ['<margin>', '<comment>', '<highlight>', '<fixme>']:
+			if inlineStatus: oldInlineStatus == inlineStatus[-1]
+			else: oldInlineStatus == ''
+			inlineStatus.append(tag)
 			if not draft: return []
-			elif format == 'latex':
-				return latex('\\marginpar{\\footnotesize{\\color{' + colors[tag] + '}{}')
-			elif format == 'html':
-				return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[tag] + '; ' + marginStyle + '">')
+			elif format in ['latex', 'beamer']:
+				return latex(latexText[tag])
+			elif format in ['html', 'revealjs']:
+				return html(closeHtmlSpan(oldInlineStatus) + htmlText[tag])
 			else: return []
 		
-		elif tag == '<comment>':
-			inlineStatus = tag
-			if not draft: return [] # If not draft, then ignore
-			elif format == 'latex':
-				return latex('\\color{' + colors[inlineStatus] + '}{}')
-			elif format == 'html': 
-				return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + ';">')
-			else: return []
+		elif tag in ['</margin>', '</comment>', '</highlight>', '</fixme>']:
+			currentInlineStatus = inlineStatus.pop()
+			if currentInlineStatus[1:] == tag[2:]: # If we have a matching closing tag...
+				if not draft: return []
+				if tag == '</margin>': closeText = latexText[tag] # Only need to close previous inline if margin.
+				else: closeText = ''
+				if inlineStatus: newTag = inlineStatus[-1] # Switch back to previous
+				else: newTag = '<end>'
+				if format in ['latex', 'beamer']:
+					return latex(closeText + latexText[newTag])
+				elif format in ['html', 'revealjs']: return html(htmlText[tag])
+			else: exit(1) # TODO Is this right?
 		
-		elif tag == '<fixref>':
-			inlineStatus = tag
-			if not draft: return[]
-			elif format == 'latex':
-				return latex('\\marginpar{\\footnotesize{\\color{' + colors[inlineStatus] + '}{}Fix ref!}}\\color{' + colors[inlineStatus] + '}{}')
-			elif format == 'html': 
-				return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + '; ' + marginStyle + '">Fix ref!</span><span style="color: ' + colors[inlineStatus] + ';">')
-			else: return []
-		
-		elif tag == '<highlight>':
-			inlineStatus = tag
-			if draft:
-				if format == 'latex':
-					return latex('\\color{' + colors[inlineStatus] + '}{}')
-				elif format in ['html', 'revealjs']:
-					return html(closeHtmlSpan(oldInlineStatus) + '<span style="color: ' + colors[inlineStatus] + ';">')
-				else: return []
-			else: return []
-		
-		elif tag == '<end>':
-			inlineStatus = tag
-			if not draft: return []
-			elif format == 'latex': 
-				if marginStatus: return latex('\\color{' + colors['<margin>'] + '}{}')
-				else: return latex('\\color{' + blockColor + '}{}')
-			elif format in ['html', 'revealjs']: return html('</span>')
-		
-		elif tag == '</margin>':
-			marginStatus = False
-			if not draft: return []
-			elif format == 'latex': return latex('\\color{' + colors[inlineStatus] + '}}}')
-			elif format == 'html': return html('</span>')
-				
 		elif tag.startswith('<l ') and tag.endswith('>'): # My definition of a label
 			label = tag[3:-1]
 			if format == 'latex': return latex('\\label{' + label + '}')
 			elif format == 'html': return html('<a name="' + label + '">')
+			
 		elif tag.startswith('<r ') and tag.endswith('>'): # My definition of a reference
 			label = tag[3:-1]
 			if format == 'latex': return latex('\\cref{' + label + '}')
 			elif format == 'html': return html('<a href="#' + label + '">here</a>')
+			
 		elif tag.startswith('<rp ') and tag.endswith('>'): # My definition of a page reference
 			label = tag[4:-1]
 			if format == 'latex': return latex('\\cpageref{' + label + '}')
@@ -293,9 +315,9 @@ def handle_comments(key, value, format, meta):
 	
 	# Finally, if we're not in draft mode and we're reading a block comment or 
 	# an inline comment or margin note, then suppress output.
-	elif blockStatus in ['<!comment>'] and not draft and format != 'revealjs': return []
-	elif inlineStatus in ['<comment>'] and not draft: return []
-	elif marginStatus and not draft: return[]
+	elif '<!comment>' in blockStatus and not draft and format != 'revealjs': return []
+	elif '<comment>' in inlineStatus and not draft: return []
+	elif '<margin>' in inlineStatus and not draft: return[]
 
 
 if __name__ == "__main__":
