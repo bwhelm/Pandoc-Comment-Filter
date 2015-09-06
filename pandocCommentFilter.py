@@ -71,8 +71,8 @@ from hashlib import sha1
 
 IMAGE_PATH = '/Users/bennett/tmp/pandoc/Figures'
 
-blockStatus = []
-inlineStatus = []
+BLOCK_STATUS = []
+INLINE_STATUS = []
 
 colors = {
 	'<!comment>': 'red', 
@@ -171,7 +171,7 @@ def closeHtmlDiv(oldBlockStatus):
 	else: return ''
 
 def handle_comments(key, value, format, meta):
-	global blockStatus, inlineStatus
+	global BLOCK_STATUS, INLINE_STATUS
 	
 	# If translating to markdown, leave everything alone.
 	if format == 'markdown': return
@@ -180,13 +180,13 @@ def handle_comments(key, value, format, meta):
 	try: draft = meta['draft']['c']
 	except KeyError: draft = False
 
-	# First check to see if we're changing blockStatus...
+	# First check to see if we're changing BLOCK_STATUS...
 	if key == 'RawBlock':
 		type, tag = value
 		if type != 'html': pass
 		tag = tag.lower()
 		if tag in ['<!comment>', '<!highlight>', '<center>']:
-			blockStatus.append(tag)
+			BLOCK_STATUS.append(tag)
 			if not draft and format != 'revealjs' and tag != '<center>': return []
 			elif format == 'latex':
 				return Para([latex(latexText[tag])])
@@ -197,11 +197,11 @@ def handle_comments(key, value, format, meta):
 			else: return []
 			
 		elif tag in ['</!comment>', '</!highlight>', '</center>']:
-			currentBlockStatus = blockStatus.pop()
+			currentBlockStatus = BLOCK_STATUS.pop()
 			if currentBlockStatus[1:] == tag[2:]: # If we have a matching closing tag...
 				if not draft and tag != '</center>': return []
 				if format == 'latex':
-					if blockStatus: tag = blockStatus[-1] # Switch back to previous
+					if BLOCK_STATUS: tag = BLOCK_STATUS[-1] # Switch back to previous
 					return Para([latex(latexText[tag])])
 				elif format == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
 					return Plain([html(htmlText[tag])])
@@ -210,14 +210,14 @@ def handle_comments(key, value, format, meta):
 				else: return []
 			else: exit(1) # TODO Is this right?
 			
-	# Then check to see if we're changing inlineStatus...
+	# Then check to see if we're changing INLINE_STATUS...
 	elif key == 'RawInline':
 		type, tag = value
 		if type != 'html': pass
 		tag = tag.lower()
 		
 		if tag in ['<margin>', '<comment>', '<highlight>', '<fixme>']:
-			inlineStatus.append(tag)
+			INLINE_STATUS.append(tag)
 			if not draft: return []
 			elif format in ['latex', 'beamer']:
 				return latex(latexText[tag])
@@ -226,16 +226,16 @@ def handle_comments(key, value, format, meta):
 			else: return []
 		
 		elif tag in ['</margin>', '</comment>', '</highlight>', '</fixme>']:
-			currentInlineStatus = inlineStatus.pop()
+			currentInlineStatus = INLINE_STATUS.pop()
 			if currentInlineStatus[1:] == tag[2:]: # If we have a matching closing tag...
 				if not draft: return []
 				if format in ['latex', 'beamer']:
-					if inlineStatus: # Need to switch back to previous inline ...
-						if inlineStatus[-1] == '<margin>': newText = latexText['<comment>'] # TODO Need to find a more general solution that works for `<fixme>` as well.
-						else: newText = latexText[inlineStatus[-1]]
+					if INLINE_STATUS: # Need to switch back to previous inline ...
+						if INLINE_STATUS[-1] == '<margin>': newText = latexText['<comment>'] # TODO Need to find a more general solution that works for `<fixme>` as well.
+						else: newText = latexText[INLINE_STATUS[-1]]
 						if tag == '</margin>': newText = latexText[tag] + newText # Need to close the margin environment before switching back
-					elif blockStatus: 
-						newText = latexText[blockStatus[-1]] # ... or to previous block
+					elif BLOCK_STATUS: 
+						newText = latexText[BLOCK_STATUS[-1]] # ... or to previous block
 						if tag == '</margin>': newText = latexText[tag] + newText # Need to close the margin environment before switching back
 					else: newText = latexText[tag]
 					return latex(newText)
@@ -245,7 +245,7 @@ def handle_comments(key, value, format, meta):
 		elif tag.startswith('<l ') and tag.endswith('>'): # My definition of a label
 			label = tag[3:-1]
 			if format == 'latex': return latex('\\label{' + label + '}')
-			elif format == 'html': return html('<a name="' + label + '">')
+			elif format == 'html': return html('<a name="' + label + '"></a>')
 			
 		elif tag.startswith('<r ') and tag.endswith('>'): # My definition of a reference
 			label = tag[3:-1]
@@ -264,6 +264,7 @@ def handle_comments(key, value, format, meta):
 		try:
 			if value[0]['t'] == 'Str' and value[0]['c'] == '<' and value[1]['t'] == 'Space': 
 				if format == 'latex': return Para([latex('\\noindent{}')] + value[2:])
+				elif format == 'html': return Para(value[2:])
 				else: return Para(value[2:])
 		except: pass # May happen if the paragraph is empty.
 	
@@ -308,9 +309,9 @@ def handle_comments(key, value, format, meta):
 	
 	# Finally, if we're not in draft mode and we're reading a block comment or 
 	# an inline comment or margin note, then suppress output.
-	elif '<!comment>' in blockStatus and not draft and format != 'revealjs': return []
-	elif '<comment>' in inlineStatus and not draft: return []
-	elif '<margin>' in inlineStatus and not draft: return[]
+	elif '<!comment>' in BLOCK_STATUS and not draft and format != 'revealjs': return []
+	elif '<comment>' in INLINE_STATUS and not draft: return []
+	elif '<margin>' in INLINE_STATUS and not draft: return[]
 
 
 if __name__ == "__main__":
