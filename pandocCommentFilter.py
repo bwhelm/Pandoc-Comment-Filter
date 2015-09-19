@@ -49,6 +49,7 @@ Copyright (C) 2015 Bennett Helm
 `<l LABEL>`: create a label
 `<r LABEL>`: create a reference
 `<rp LABEL>`: create a page reference
+`<i text-for-index>`: create a LaTeX \\index{text-for-index}
 
 
 ## Images: Allow for tikZ figures in code blocks. They should have the following format:
@@ -241,6 +242,11 @@ def handle_comments(key, value, format, meta):
 					return latex(newText)
 				elif format in ['html', 'revealjs']: return html(htmlText[tag])
 			else: exit(1) # TODO Is this right?
+		
+		elif tag.startswith('<i ') and tag.endswith('>'): # Index
+			indexText = tag[3:-1]
+			if format == 'latex': return latex('\\index{' + indexText + '}')
+			else: return []
 			
 		elif tag.startswith('<l ') and tag.endswith('>'): # My definition of a label
 			label = tag[3:-1]
@@ -311,7 +317,7 @@ def handle_comments(key, value, format, meta):
 	# an inline comment or margin note, then suppress output.
 	elif '<!comment>' in BLOCK_STATUS and not draft and format != 'revealjs': return []
 	elif '<comment>' in INLINE_STATUS and not draft: return []
-	elif '<margin>' in INLINE_STATUS and not draft: return[]
+	elif '<margin>' in INLINE_STATUS and not draft: return []
 
 
 if __name__ == "__main__":
