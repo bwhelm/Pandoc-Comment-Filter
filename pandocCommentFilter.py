@@ -264,7 +264,7 @@ def handle_comments(key, value, format, meta):
 		try:
 			if value[0]['t'] == 'Str' and value[0]['c'] == '<' and value[1]['t'] == 'Space': 
 				if format == 'latex': return Para([latex('\\noindent{}')] + value[2:])
-				elif format == 'html': return Para(value[2:])
+				elif format == 'html': return [Plain([html('<div class="noindent"></div>')]), Para(value[2:])]
 				else: return Para(value[2:])
 		except: pass # May happen if the paragraph is empty.
 	
