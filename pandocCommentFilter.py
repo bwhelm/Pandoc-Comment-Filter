@@ -65,7 +65,7 @@ Copyright (C) 2015 Bennett Helm
 from pandocfilters import toJSONFilter, RawInline, Para, Plain, Image, Str
 from os import path, mkdir, chdir, getcwd
 from shutil import copyfile, rmtree
-from sys import getfilesystemencoding, stderr
+from sys import getfilesystemencoding, stderr # Use `print(something, file=stderr)` for debugging
 from tempfile import mkdtemp
 from subprocess import call
 from hashlib import sha1
@@ -115,8 +115,8 @@ htmlText = {
 	'</margin>': '</span>',
 	'<fixme>': '<span style="color: ' + colors['<fixme>'] + '; ' + marginStyle + '">Fix this!</span><span style="color: ' + colors['<fixme>'] + ';">',
 	'</fixme>': '</span>',
-	'<center>': '<center>', # TODO for html5, need something like: '<div text-align:center;>'
-	'</center>': '</center>' # TODO for html5, need something like: '</div>'
+	'<center>': '<div style="text-align:center";>',
+	'</center>': '</div>'
 }
 revealjsText = { # TODO Fill this out where needed!
 	'<!comment>': '<aside class="notes">',
@@ -191,7 +191,7 @@ def handle_comments(key, value, format, meta):
 			if not draft and format != 'revealjs' and tag != '<center>': return []
 			elif format == 'latex':
 				return Para([latex(latexText[tag])])
-			elif format == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
+			elif format[:4] == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
 				return Plain([html(htmlText[tag])])
 			elif format == 'revealjs': # tag == '<!comment>', so make speaker note
 				return Plain([html(revealjsText[tag])])
@@ -204,7 +204,7 @@ def handle_comments(key, value, format, meta):
 				if format == 'latex':
 					if BLOCK_STATUS: tag = BLOCK_STATUS[-1] # Switch back to previous
 					return Para([latex(latexText[tag])])
-				elif format == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
+				elif format[0:4] == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
 					return Plain([html(htmlText[tag])])
 				elif format == 'revealjs':
 					return Plain([html(revealjsText[tag])])
@@ -222,7 +222,7 @@ def handle_comments(key, value, format, meta):
 			if not draft: return []
 			elif format in ['latex', 'beamer']:
 				return latex(latexText[tag])
-			elif format in ['html', 'revealjs']:
+			elif format in ['html', 'html5', 'revealjs']:
 				return html(htmlText[tag])
 			else: return []
 		
@@ -240,7 +240,7 @@ def handle_comments(key, value, format, meta):
 						if tag == '</margin>': newText = latexText[tag] + newText # Need to close the margin environment before switching back
 					else: newText = latexText[tag]
 					return latex(newText)
-				elif format in ['html', 'revealjs']: return html(htmlText[tag])
+				elif format in ['html', 'html5', 'revealjs']: return html(htmlText[tag])
 			else: exit(1) # TODO Is this right?
 		
 		elif tag.startswith('<i ') and tag.endswith('>'): # Index
@@ -251,17 +251,17 @@ def handle_comments(key, value, format, meta):
 		elif tag.startswith('<l ') and tag.endswith('>'): # My definition of a label
 			label = tag[3:-1]
 			if format == 'latex': return latex('\\label{' + label + '}')
-			elif format == 'html': return html('<a name="' + label + '"></a>')
+			elif format[0:4] == 'html': return html('<a name="' + label + '"></a>')
 			
 		elif tag.startswith('<r ') and tag.endswith('>'): # My definition of a reference
 			label = tag[3:-1]
 			if format == 'latex': return latex('\\cref{' + label + '}')
-			elif format == 'html': return html('<a href="#' + label + '">here</a>')
+			elif format[0:4] == 'html': return html('<a href="#' + label + '">here</a>')
 			
 		elif tag.startswith('<rp ') and tag.endswith('>'): # My definition of a page reference
 			label = tag[4:-1]
 			if format == 'latex': return latex('\\cpageref{' + label + '}')
-			elif format == 'html': return html('<a href="#' + label + '">here</a>')
+			elif format[0:4] == 'html': return html('<a href="#' + label + '">here</a>')
 	
 	
 	# If translating to LaTeX, beginning a paragraph with '<' will cause 
@@ -270,7 +270,7 @@ def handle_comments(key, value, format, meta):
 		try:
 			if value[0]['t'] == 'Str' and value[0]['c'] == '<' and value[1]['t'] == 'Space': 
 				if format == 'latex': return Para([latex('\\noindent{}')] + value[2:])
-				elif format == 'html': return [Plain([html('<div class="noindent"></div>')]), Para(value[2:])]
+				elif format[0:4] == 'html': return [Plain([html('<div class="noindent"></div>')]), Para(value[2:])]
 				else: return Para(value[2:])
 		except: pass # May happen if the paragraph is empty.
 	
@@ -280,7 +280,7 @@ def handle_comments(key, value, format, meta):
 		(id, classes, attributes), code = value
 		if 'tikz' in classes or '\\begin{tikzpicture}' in code:
 			outfile = path.join(IMAGE_PATH, my_sha1(code))
-			if format == 'html': filetype = 'png'
+			if format[0:4] == 'html': filetype = 'png'
 			if format == 'latex': filetype = 'pdf'
 			else: filetype = 'png'
 			sourceFile = outfile + '.' + filetype
@@ -302,9 +302,9 @@ def handle_comments(key, value, format, meta):
 				return Para([Image([Str(caption)], [sourceFile, caption]), Str(id)])
 			else:
 				return Para([Image([Str(caption)], [sourceFile, caption])])
-
 	
-	# Check for images and copy/convert to IMAGE_PATH
+
+# 	# Check for images and copy/convert to IMAGE_PATH
 # 	elif key == 'Image':
 # 		c, f = value
 # 		caption = c[0]['c']
