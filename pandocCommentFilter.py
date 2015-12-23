@@ -29,6 +29,8 @@ Copyright (C) 2015 Bennett Helm
 `</!highlight>`: end highlight block
 `<center>`: begin centering
 `</center>`: end centering
+`<!box>`: begin frame box
+`</!box>`: end frame box
 
 
 ## Inline Items:
@@ -91,6 +93,8 @@ latexText = {
 	'</!comment>': endColor,
 	'<!highlight>': '\\color{' + colors['<!highlight>'] + '}{}',
 	'</!highlight>': endColor,
+	'<!box>': '\\medskip\\noindent\\fbox{\\begin{minipage}[t]{0.98\\columnwidth}',
+	'</!box>': '\\end{minipage}}\medskip{}',
 	'<comment>': '\\color{' + colors['<comment>'] + '}{}',
 	'</comment>': endColor,
 	'<highlight>': '\\color{' + colors['<highlight>'] + '}{}',
@@ -116,23 +120,27 @@ htmlText = {
 	'<fixme>': '<span style="color: ' + colors['<fixme>'] + '; ' + marginStyle + '">Fix this!</span><span style="color: ' + colors['<fixme>'] + ';">',
 	'</fixme>': '</span>',
 	'<center>': '<div style="text-align:center";>',
-	'</center>': '</div>'
+	'</center>': '</div>',
+	'<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
+	'</!box>': '</div>',
 }
 revealjsText = { # TODO Fill this out where needed!
-	'<!comment>': '<aside class="notes">',
-	'</!comment>': '</aside>',
-	'<!highlight>': '',
-	'</!highlight>': '',
-	'<comment>': '',
-	'</comment>': '',
-	'<highlight>': '',
-	'</highlight>': '',
+	'<!comment>': '<div style="color: ' + colors['<!comment>'] + ';">',
+	'</!comment>': '</div>',
+	'<!highlight>': '<div style="color: ' + colors['<!highlight>'] + ';">',
+	'</!highlight>': '</div>',
+	'<comment>': '<span style="color: ' + colors['<comment>'] + ';">',
+	'</comment>': '</span>',
+	'<highlight>': '<span style="color: ' + colors['<highlight>'] + ';">',
+	'</highlight>': '</span>',
 	'<margin>': '',
 	'</margin>': '',
 	'<fixme>': '',
 	'</fixme>': '',
 	'<center>': '',
-	'</center>': ''
+	'</center>': '',
+	'<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
+	'</!box>': '</div>',
 }
 
 def my_sha1(x):
@@ -188,7 +196,7 @@ def handle_comments(key, value, format, meta):
 		tag = tag.lower()
 		if tag in ['<!comment>', '<!highlight>', '<center>']:
 			BLOCK_STATUS.append(tag)
-			if not draft and format != 'revealjs' and tag != '<center>': return []
+			if not draft and format != 'revealjs' and tag not in ['<center>']: return []
 			elif format == 'latex':
 				return Para([latex(latexText[tag])])
 			elif format[:4] == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
@@ -200,7 +208,7 @@ def handle_comments(key, value, format, meta):
 		elif tag in ['</!comment>', '</!highlight>', '</center>']:
 			currentBlockStatus = BLOCK_STATUS.pop()
 			if currentBlockStatus[1:] == tag[2:]: # If we have a matching closing tag...
-				if not draft and tag != '</center>': return []
+				if not draft and tag not in ['</center>']: return []
 				if format == 'latex':
 					if BLOCK_STATUS: tag = BLOCK_STATUS[-1] # Switch back to previous
 					return Para([latex(latexText[tag])])
@@ -210,6 +218,13 @@ def handle_comments(key, value, format, meta):
 					return Plain([html(revealjsText[tag])])
 				else: return []
 			else: exit(1) # TODO Is this right?
+		elif tag in ['<!box>', '</!box>'] and not(draft == False and '<!comment>' in BLOCK_STATUS):
+			# Note that when the box is nested inside a `<!comment>` block and 
+			# draft == False, I want no box at all. The above conditional does this.
+			if format == 'latex': return Para([latex(latexText[tag])])
+			elif format[:4] == 'html': return Plain([html(htmlText[tag])])
+			elif format == 'revealjs': return Plain([html(revealjsText[tag])])
+			else: return [] # TODO Is this right?
 			
 	# Then check to see if we're changing INLINE_STATUS...
 	elif key == 'RawInline':
