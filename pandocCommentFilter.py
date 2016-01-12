@@ -37,7 +37,7 @@ Copyright (C) 2015 Bennett Helm
 
 `<comment>`: begin commenting
 `</comment>`: end commenting
-`<highlight>`: begin highlighting
+`<highlight>`: begin highlighting (note that this requires that `soul.sty` be loaded)
 `</highlight>`: end highlighting
 `<fixme>`: begin FixMe margin note (and highlighting)
 `</fixme>`: end FixMe margin note (and highlighting)
@@ -80,8 +80,8 @@ INLINE_STATUS = []
 colors = {
 	'<!comment>': 'red', 
 	'<comment>': 'red', 
-	'<!highlight>': 'magenta', 
-	'<highlight>': 'magenta',
+	'<!highlight>': 'yellow', 
+	'<highlight>': 'yellow',
 	'<margin>': 'red',
 	'<fixme>': 'cyan',
 }
@@ -97,8 +97,8 @@ latexText = {
 	'</!box>': '\\end{minipage}}\medskip{}',
 	'<comment>': '\\color{' + colors['<comment>'] + '}{}',
 	'</comment>': endColor,
-	'<highlight>': '\\color{' + colors['<highlight>'] + '}{}',
-	'</highlight>': endColor,
+	'<highlight>': '\\hl{',
+	'</highlight>': '}',
 	'<margin>': '\\marginpar{\\footnotesize{\\color{' + colors['<margin>'] + '}{}',
 	'</margin>': '}}',
 	'<fixme>': '\\marginpar{\\footnotesize{\\color{' + colors['<fixme>'] + '}{}Fix this!}}\\color{' + colors['<fixme>'] + '}{}',
@@ -109,12 +109,12 @@ latexText = {
 htmlText = {
 	'<!comment>': '<div style="color: ' + colors['<!comment>'] + ';">',
 	'</!comment>': '</div>',
-	'<!highlight>': '<div style="color: ' + colors['<!highlight>'] + ';">',
+	'<!highlight>': '<div style="background-color: ' + colors['<!highlight>'] + ';">',
 	'</!highlight>': '</div>',
 	'<comment>': '<span style="color: ' + colors['<comment>'] + ';">',
 	'</comment>': '</span>',
-	'<highlight>': '<span style="color: ' + colors['<highlight>'] + ';">',
-	'</highlight>': '</span>',
+	'<highlight>': '<mark>',
+	'</highlight>': '</mark>',
 	'<margin>': '<span style="color: ' + colors['<margin>'] + '; ' + marginStyle + '">',
 	'</margin>': '</span>',
 	'<fixme>': '<span style="color: ' + colors['<fixme>'] + '; ' + marginStyle + '">Fix this!</span><span style="color: ' + colors['<fixme>'] + ';">',
@@ -125,14 +125,14 @@ htmlText = {
 	'</!box>': '</div>',
 }
 revealjsText = { # TODO Fill this out where needed!
-	'<!comment>': '<div style="color: ' + colors['<!comment>'] + ';">',
-	'</!comment>': '</div>',
-	'<!highlight>': '<div style="color: ' + colors['<!highlight>'] + ';">',
+	'<!comment>': '<aside class="notes">',
+	'</!comment>': '</aside>',
+	'<!highlight>': '<div style="background-color: ' + colors['<!highlight>'] + ';">',
 	'</!highlight>': '</div>',
 	'<comment>': '<span style="color: ' + colors['<comment>'] + ';">',
 	'</comment>': '</span>',
-	'<highlight>': '<span style="color: ' + colors['<highlight>'] + ';">',
-	'</highlight>': '</span>',
+	'<highlight>': '<mark>',
+	'</highlight>': '</mark>',
 	'<margin>': '',
 	'</margin>': '',
 	'<fixme>': '',
