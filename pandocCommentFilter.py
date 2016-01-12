@@ -125,8 +125,8 @@ htmlText = {
 	'</!box>': '</div>',
 }
 revealjsText = { # TODO Fill this out where needed!
-	'<!comment>': '<div style="color: ' + colors['<!comment>'] + ';">',
-	'</!comment>': '</div>',
+	'<!comment>': '<aside class="notes">',
+	'</!comment>': '</aside>',
 	'<!highlight>': '<div style="color: ' + colors['<!highlight>'] + ';">',
 	'</!highlight>': '</div>',
 	'<comment>': '<span style="color: ' + colors['<comment>'] + ';">',
