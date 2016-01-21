@@ -7,16 +7,16 @@ non-draft mode, only highlights are displayed, and that only in black.
 
 Copyright (C) 2015 Bennett Helm 
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 # Syntax Extensions
@@ -25,8 +25,6 @@ Copyright (C) 2015 Bennett Helm
 
 `<!comment>`: begin comment block (or speaker notes for revealjs)
 `</!comment>`: end comment block (or speaker notes for revealjs)
-`<!highlight>`: begin highlight block
-`</!highlight>`: end highlight block
 `<center>`: begin centering
 `</center>`: end centering
 `<!box>`: begin frame box
@@ -37,7 +35,7 @@ Copyright (C) 2015 Bennett Helm
 
 `<comment>`: begin commenting
 `</comment>`: end commenting
-`<highlight>`: begin highlighting
+`<highlight>`: begin highlighting (note that this requires that `soul.sty` be loaded)
 `</highlight>`: end highlighting
 `<fixme>`: begin FixMe margin note (and highlighting)
 `</fixme>`: end FixMe margin note (and highlighting)
@@ -76,12 +74,12 @@ IMAGE_PATH = '/Users/bennett/tmp/pandoc/Figures'
 
 BLOCK_STATUS = []
 INLINE_STATUS = []
+HIGHLIGHT_STATUS = False
 
 colors = {
 	'<!comment>': 'red', 
 	'<comment>': 'red', 
-	'<!highlight>': 'magenta', 
-	'<highlight>': 'magenta',
+	'<highlight>': 'yellow',
 	'<margin>': 'red',
 	'<fixme>': 'cyan',
 }
@@ -91,14 +89,12 @@ marginStyle = 'max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex
 latexText = {
 	'<!comment>': '\\color{' + colors['<!comment>'] + '}{}',
 	'</!comment>': endColor,
-	'<!highlight>': '\\color{' + colors['<!highlight>'] + '}{}',
-	'</!highlight>': endColor,
 	'<!box>': '\\medskip\\noindent\\fbox{\\begin{minipage}[t]{0.98\\columnwidth}',
 	'</!box>': '\\end{minipage}}\medskip{}',
 	'<comment>': '\\color{' + colors['<comment>'] + '}{}',
 	'</comment>': endColor,
-	'<highlight>': '\\color{' + colors['<highlight>'] + '}{}',
-	'</highlight>': endColor,
+	'<highlight>': '\\hl{',
+	'</highlight>': '}',
 	'<margin>': '\\marginpar{\\footnotesize{\\color{' + colors['<margin>'] + '}{}',
 	'</margin>': '}}',
 	'<fixme>': '\\marginpar{\\footnotesize{\\color{' + colors['<fixme>'] + '}{}Fix this!}}\\color{' + colors['<fixme>'] + '}{}',
@@ -109,12 +105,10 @@ latexText = {
 htmlText = {
 	'<!comment>': '<div style="color: ' + colors['<!comment>'] + ';">',
 	'</!comment>': '</div>',
-	'<!highlight>': '<div style="color: ' + colors['<!highlight>'] + ';">',
-	'</!highlight>': '</div>',
 	'<comment>': '<span style="color: ' + colors['<comment>'] + ';">',
 	'</comment>': '</span>',
-	'<highlight>': '<span style="color: ' + colors['<highlight>'] + ';">',
-	'</highlight>': '</span>',
+	'<highlight>': '<mark>',
+	'</highlight>': '</mark>',
 	'<margin>': '<span style="color: ' + colors['<margin>'] + '; ' + marginStyle + '">',
 	'</margin>': '</span>',
 	'<fixme>': '<span style="color: ' + colors['<fixme>'] + '; ' + marginStyle + '">Fix this!</span><span style="color: ' + colors['<fixme>'] + ';">',
@@ -127,12 +121,10 @@ htmlText = {
 revealjsText = { # TODO Fill this out where needed!
 	'<!comment>': '<aside class="notes">',
 	'</!comment>': '</aside>',
-	'<!highlight>': '<div style="color: ' + colors['<!highlight>'] + ';">',
-	'</!highlight>': '</div>',
 	'<comment>': '<span style="color: ' + colors['<comment>'] + ';">',
 	'</comment>': '</span>',
-	'<highlight>': '<span style="color: ' + colors['<highlight>'] + ';">',
-	'</highlight>': '</span>',
+	'<highlight>': '<mark>',
+	'</highlight>': '</mark>',
 	'<margin>': '',
 	'</margin>': '',
 	'<fixme>': '',
@@ -176,11 +168,11 @@ def closeHtmlSpan(oldInlineStatus):
 	else: return ''
 
 def closeHtmlDiv(oldBlockStatus):
-	if oldBlockStatus in ['<!comment>', '<!highlight>']: return '</div>'
+	if oldBlockStatus in ['<!comment>']: return '</div>'
 	else: return ''
 
 def handle_comments(key, value, format, meta):
-	global BLOCK_STATUS, INLINE_STATUS
+	global BLOCK_STATUS, INLINE_STATUS, HIGHLIGHT_STATUS
 	
 	# If translating to markdown, leave everything alone.
 	if format == 'markdown': return
@@ -188,31 +180,34 @@ def handle_comments(key, value, format, meta):
 	# Get draft status from metadata field (or assume not draft if there's no such field)
 	try: draft = meta['draft']['c']
 	except KeyError: draft = False
-
-	# First check to see if we're changing BLOCK_STATUS...
+	
+	# Check to see if we're changing BLOCK_STATUS...
 	if key == 'RawBlock':
 		type, tag = value
 		if type != 'html': pass
 		tag = tag.lower()
-		if tag in ['<!comment>', '<!highlight>', '<center>']:
+		if tag in ['<!comment>', '<center>']:
 			BLOCK_STATUS.append(tag)
 			if not draft and format != 'revealjs' and tag not in ['<center>']: return []
 			elif format == 'latex':
-				return Para([latex(latexText[tag])])
+				if HIGHLIGHT_STATUS: return Para([latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>'])])
+				else: return Para([latex(latexText[tag])])
 			elif format[:4] == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
 				return Plain([html(htmlText[tag])])
 			elif format == 'revealjs': # tag == '<!comment>', so make speaker note
 				return Plain([html(revealjsText[tag])])
 			else: return []
 			
-		elif tag in ['</!comment>', '</!highlight>', '</center>']:
+		elif tag in ['</!comment>', '</center>']:
 			currentBlockStatus = BLOCK_STATUS.pop()
 			if currentBlockStatus[1:] == tag[2:]: # If we have a matching closing tag...
 				if not draft and tag not in ['</center>']: return []
 				if format == 'latex':
+					preText = ''
 					if BLOCK_STATUS: tag = BLOCK_STATUS[-1] # Switch back to previous
-					return Para([latex(latexText[tag])])
-				elif format[0:4] == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
+					if HIGHLIGHT_STATUS: return Para([latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>'])])
+					else: return Para([latex(latexText[tag])])
+				elif format[0:4] == 'html' or format == 'revealjs':
 					return Plain([html(htmlText[tag])])
 				elif format == 'revealjs':
 					return Plain([html(revealjsText[tag])])
@@ -232,20 +227,41 @@ def handle_comments(key, value, format, meta):
 		if type != 'html': pass
 		tag = tag.lower()
 		
-		if tag in ['<margin>', '<comment>', '<highlight>', '<fixme>']:
-			INLINE_STATUS.append(tag)
-			if not draft: return []
-			elif format in ['latex', 'beamer']:
+		if tag == '<highlight>': # Highlight needs to be handled separately (and cannot have text color changed inside the highlighting).
+			if HIGHLIGHT_STATUS == True: return
+			HIGHLIGHT_STATUS = True
+			if format in ['latex', 'beamer']:
 				return latex(latexText[tag])
 			elif format in ['html', 'html5', 'revealjs']:
 				return html(htmlText[tag])
 			else: return []
+		elif tag == '</highlight>':
+			if HIGHLIGHT_STATUS == False: return
+			HIGHLIGHT_STATUS = False
+			if format in ['latex', 'beamer']:
+				newText = latexText[tag]
+				return latex(newText)
+			elif format in ['html', 'html5', 'revealjs']: return html(htmlText[tag])
+		elif tag in ['<margin>', '<comment>', '<fixme>']:
+			INLINE_STATUS.append(tag)
+			if not draft: return []
+			elif format in ['latex', 'beamer']:
+				if HIGHLIGHT_STATUS: return latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>'])
+				else: return latex(latexText[tag])
+			elif format in ['html', 'html5', 'revealjs']:
+				return html(htmlText[tag])
+			else: return []
 		
-		elif tag in ['</margin>', '</comment>', '</highlight>', '</fixme>']:
+		elif tag in ['</margin>', '</comment>', '</fixme>']:
 			currentInlineStatus = INLINE_STATUS.pop()
 			if currentInlineStatus[1:] == tag[2:]: # If we have a matching closing tag...
 				if not draft: return []
-				if format in ['latex', 'beamer']:
+				elif format in ['latex', 'beamer']:
+					preText = ''
+					postText = ''
+					if HIGHLIGHT_STATUS: 
+						preText = latexText['</highlight>']
+						postText = latexText['<highlight>']
 					if INLINE_STATUS: # Need to switch back to previous inline ...
 						if INLINE_STATUS[-1] == '<margin>': newText = latexText['<comment>'] # TODO Need to find a more general solution that works for `<fixme>` as well.
 						else: newText = latexText[INLINE_STATUS[-1]]
@@ -254,7 +270,7 @@ def handle_comments(key, value, format, meta):
 						newText = latexText[BLOCK_STATUS[-1]] # ... or to previous block
 						if tag == '</margin>': newText = latexText[tag] + newText # Need to close the margin environment before switching back
 					else: newText = latexText[tag]
-					return latex(newText)
+					return latex(preText + newText + postText)
 				elif format in ['html', 'html5', 'revealjs']: return html(htmlText[tag])
 			else: exit(1) # TODO Is this right?
 		
