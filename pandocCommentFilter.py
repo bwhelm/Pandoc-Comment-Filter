@@ -23,36 +23,38 @@ Copyright (C) 2015 Bennett Helm
 
 ## Block-Level Items:
 
-`<!comment>`: begin comment block (or speaker notes for revealjs)
-`</!comment>`: end comment block (or speaker notes for revealjs)
-`<center>`: begin centering
-`</center>`: end centering
-`<!box>`: begin frame box
-`</!box>`: end frame box
+`<!comment>`:	begin comment block (or speaker notes for revealjs)
+`</!comment>`:	end comment block (or speaker notes for revealjs)
+`<center>`:		begin centering
+`</center>`:	end centering
+`<!box>`:		begin frame box
+`</!box>`:		end frame box
 
 
 ## Inline Items:
 
-`<comment>`: begin commenting
-`</comment>`: end commenting
-`<highlight>`: begin highlighting (note that this requires that `soul.sty` be loaded)
-`</highlight>`: end highlighting
-`<fixme>`: begin FixMe margin note (and highlighting)
-`</fixme>`: end FixMe margin note (and highlighting)
-`<margin>`: begin margin note
-`</margin>`: end margin note
+`<comment>`:	begin commenting
+`</comment>`:	end commenting
+`<highlight>`:	begin highlighting (note that this requires that `soul.sty` 
+				be loaded in LaTeX)
+`</highlight>`:	end highlighting
+`<fixme>`:		begin FixMe margin note (and highlighting)
+`</fixme>`:		end FixMe margin note (and highlighting)
+`<margin>`:		begin margin note
+`</margin>`:	end margin note
 
 
 ## Other Items:
 
-`< `: do not indent paragraph (used after quotation block)
-`<l LABEL>`: create a label
-`<r LABEL>`: create a reference
-`<rp LABEL>`: create a page reference
-`<i text-for-index>`: create a LaTeX \\index{text-for-index}
+`< `:			do not indent paragraph (after quotation block or lists, e.g.)
+`<l LABEL>`:	create a label
+`<r LABEL>`:	create a reference
+`<rp LABEL>`:	create a page reference
+`<i text-for-index>`: create a LaTeX index mark (`\\index{text-for-index}`)
 
 
-## Images: Allow for tikZ figures in code blocks. They should have the following format:
+## Images: Allow for tikZ figures in code blocks. They should have the following
+   format:
 
 ~~~ {#tikz caption='Caption' id='fig:id' tikzlibrary='items,to,go,in,\\usetikzlibrary{}'}
 
@@ -194,7 +196,7 @@ def handle_comments(key, value, format, meta):
 				else: return Para([latex(latexText[tag])])
 			elif format[:4] == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
 				return Plain([html(htmlText[tag])])
-			elif format == 'revealjs': # tag == '<!comment>', so make speaker note
+			elif format == 'revealjs':
 				return Plain([html(revealjsText[tag])])
 			else: return []
 			
@@ -212,14 +214,14 @@ def handle_comments(key, value, format, meta):
 				elif format == 'revealjs':
 					return Plain([html(revealjsText[tag])])
 				else: return []
-			else: exit(1) # TODO Is this right?
+			else: exit(1) # TODO Is this the right thing to do?
 		elif tag in ['<!box>', '</!box>'] and not(draft == False and '<!comment>' in BLOCK_STATUS):
 			# Note that when the box is nested inside a `<!comment>` block and 
 			# draft == False, I want no box at all. The above conditional does this.
 			if format == 'latex': return Para([latex(latexText[tag])])
 			elif format[:4] == 'html': return Plain([html(htmlText[tag])])
 			elif format == 'revealjs': return Plain([html(revealjsText[tag])])
-			else: return [] # TODO Is this right?
+			else: return [] # TODO Is this the right thing to do?
 			
 	# Then check to see if we're changing INLINE_STATUS...
 	elif key == 'RawInline':
@@ -272,7 +274,7 @@ def handle_comments(key, value, format, meta):
 					else: newText = latexText[tag]
 					return latex(preText + newText + postText)
 				elif format in ['html', 'html5', 'revealjs']: return html(htmlText[tag])
-			else: exit(1) # TODO Is this right?
+			else: exit(1) # TODO Is this the right thing to do?
 		
 		elif tag.startswith('<i ') and tag.endswith('>'): # Index
 			indexText = tag[3:-1]
@@ -333,15 +335,6 @@ def handle_comments(key, value, format, meta):
 				return Para([Image([Str(caption)], [sourceFile, caption]), Str(id)])
 			else:
 				return Para([Image([Str(caption)], [sourceFile, caption])])
-	
-
-# 	# Check for images and copy/convert to IMAGE_PATH
-# 	elif key == 'Image':
-# 		c, f = value
-# 		caption = c[0]['c']
-# 		imageFile, label = f
-# 		newImageFile = copyImage(imageFile, format)
-# 		return Image([Str(caption)], [newImageFile, label])
 	
 	
 	# Finally, if we're not in draft mode and we're reading a block comment or 
