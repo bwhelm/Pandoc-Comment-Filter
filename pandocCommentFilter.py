@@ -209,7 +209,7 @@ def handle_comments(key, value, format, meta):
 					if BLOCK_STATUS: tag = BLOCK_STATUS[-1] # Switch back to previous
 					if HIGHLIGHT_STATUS: return Para([latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>'])])
 					else: return Para([latex(latexText[tag])])
-				elif format[0:4] == 'html' or format == 'revealjs':
+				elif format[0:4] == 'html':
 					return Plain([html(htmlText[tag])])
 				elif format == 'revealjs':
 					return Plain([html(revealjsText[tag])])
