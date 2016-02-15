@@ -157,7 +157,7 @@ def tikz2image(tikz, filetype, outfile, library, font):
 	if filetype == 'pdf':
 		copyfile(path.join(tmpdir, 'tikz.pdf'), outfile + '.' + filetype)
 	else:
-		call(['convert', path.join(tmpdir, 'tikz.pdf'), outfile + '.' + filetype])
+		call(['convert', '-density', '300', path.join(tmpdir, 'tikz.pdf'), '-quality', '100', outfile + '.' + filetype])
 	rmtree(tmpdir)
 
 def latex(text):
