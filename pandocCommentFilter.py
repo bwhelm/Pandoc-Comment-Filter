@@ -140,12 +140,13 @@ revealjsText = { # TODO Fill this out where needed!
 def my_sha1(x):
 	return sha1(x.encode(getfilesystemencoding())).hexdigest()
 
-def tikz2image(tikz, filetype, outfile, library):
+def tikz2image(tikz, filetype, outfile, library, font):
+	if not font: font = 'MinionPro'
 	tmpdir = mkdtemp()
 	olddir = getcwd()
 	chdir(tmpdir)
 	f = open('tikz.tex', 'w')
-	f.write('\\documentclass{standalone}\n\\usepackage{tikz}\n')
+	f.write('\\documentclass{standalone}\n\\usepackage{' + font + '}\n\\usepackage{tikz}\n')
 	if library: f.write('\\usetikzlibrary{' + library + '}\n')
 	f.write('\\begin{document}\n')
 	f.write(tikz)
@@ -156,7 +157,7 @@ def tikz2image(tikz, filetype, outfile, library):
 	if filetype == 'pdf':
 		copyfile(path.join(tmpdir, 'tikz.pdf'), outfile + '.' + filetype)
 	else:
-		call(['convert', path.join(tmpdir, 'tikz.pdf'), outfile + '.' + filetype])
+		call(['convert', '-density', '300', path.join(tmpdir, 'tikz.pdf'), '-quality', '100', outfile + '.' + filetype])
 	rmtree(tmpdir)
 
 def latex(text):
@@ -318,23 +319,20 @@ def handle_comments(key, value, format, meta):
 			else: filetype = 'png'
 			sourceFile = outfile + '.' + filetype
 			caption = ''
-			id = ''
 			library = ''
+			font = ''
 			for a, b in attributes:
 				if a == 'caption': caption = b
-				elif a == 'id': id = '{#' + b + '}'
 				elif a == 'tikzlibrary': library = b
 			if not path.isfile(sourceFile):
 				try:
 					mkdir(IMAGE_PATH)
 					stderr.write('Created directory ' + IMAGE_PATH + '\n')
 				except OSError: pass
-				tikz2image(code, filetype, outfile, library)
+				if 'fontfamily' in meta: font = meta['fontfamily']['c'][0]['c']
+				tikz2image(code, filetype, outfile, library, font)
 				stderr.write('Created image ' + sourceFile + '\n')
-			if id:
-				return Para([Image([Str(caption)], [sourceFile, caption]), Str(id)])
-			else:
-				return Para([Image([Str(caption)], [sourceFile, caption])])
+			return Para([Image((id, classes, attributes), [Str(caption)], [sourceFile, caption])])
 	
 	
 	# Finally, if we're not in draft mode and we're reading a block comment or 
