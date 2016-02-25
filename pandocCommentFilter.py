@@ -73,6 +73,7 @@ from subprocess import call
 from hashlib import sha1
 
 IMAGE_PATH = '/Users/bennett/tmp/pandoc/Figures'
+DEFAULT_FONT = 'MinionPro'
 
 BLOCK_STATUS = []
 INLINE_STATUS = []
@@ -140,17 +141,12 @@ revealjsText = { # TODO Fill this out where needed!
 def my_sha1(x):
 	return sha1(x.encode(getfilesystemencoding())).hexdigest()
 
-def tikz2image(tikz, filetype, outfile, library, font):
-	if not font: font = 'MinionPro'
+def tikz2image(tikz, filetype, outfile):
 	tmpdir = mkdtemp()
 	olddir = getcwd()
 	chdir(tmpdir)
 	f = open('tikz.tex', 'w')
-	f.write('\\documentclass{standalone}\n\\usepackage{' + font + '}\n\\usepackage{tikz}\n')
-	if library: f.write('\\usetikzlibrary{' + library + '}\n')
-	f.write('\\begin{document}\n')
 	f.write(tikz)
-	f.write('\n\\end{document}\n')
 	f.close()
 	p = call(['pdflatex', 'tikz.tex'], stdout=stderr)
 	chdir(olddir)
@@ -297,15 +293,16 @@ def handle_comments(key, value, format, meta):
 			if format == 'latex': return latex('\\cpageref{' + label + '}')
 			elif format[0:4] == 'html': return html('<a href="#' + label + '">here</a>')
 	
-	
-	# If translating to LaTeX, beginning a paragraph with '<' will cause 
-	# '\noindent{}' to be output first.
+	# Check some cases at beginnings of paragraphs
 	elif key == 'Para':
 		try:
+			# If translating to LaTeX, beginning a paragraph with '<'
+			# will cause '\noindent{}' to be output first.
 			if value[0]['t'] == 'Str' and value[0]['c'] == '<' and value[1]['t'] == 'Space': 
 				if format == 'latex': return Para([latex('\\noindent{}')] + value[2:])
 				elif format[0:4] == 'html': return [Plain([html('<div class="noindent"></div>')]), Para(value[2:])]
 				else: return Para(value[2:])
+			
 		except: pass # May happen if the paragraph is empty.
 	
 	
@@ -314,9 +311,8 @@ def handle_comments(key, value, format, meta):
 		(id, classes, attributes), code = value
 		if 'tikz' in classes or '\\begin{tikzpicture}' in code:
 			outfile = path.join(IMAGE_PATH, my_sha1(code))
-			if format[0:4] == 'html': filetype = 'png'
+			filetype = 'png' # Default extension (without '.')
 			if format == 'latex': filetype = 'pdf'
-			else: filetype = 'png'
 			sourceFile = outfile + '.' + filetype
 			caption = ''
 			library = ''
@@ -330,7 +326,12 @@ def handle_comments(key, value, format, meta):
 					stderr.write('Created directory ' + IMAGE_PATH + '\n')
 				except OSError: pass
 				if 'fontfamily' in meta: font = meta['fontfamily']['c'][0]['c']
-				tikz2image(code, filetype, outfile, library, font)
+				else: font = DEFAULT_FONT
+				codeHeader = '\\documentclass{standalone}\n\\usepackage{' + font + '}\n\\usepackage{tikz}\n'
+				if library: codeHeader += '\\usetikzlibrary{' + library + '}\n'
+				codeHeader += '\\begin{document}\n'
+				codeFooter = '\n\\end{document}\n'
+				tikz2image(codeHeader + code + codeFooter, filetype, outfile)
 				stderr.write('Created image ' + sourceFile + '\n')
 			return Para([Image((id, classes, attributes), [Str(caption)], [sourceFile, caption])])
 	
