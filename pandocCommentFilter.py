@@ -56,11 +56,13 @@ Copyright (C) 2015 Bennett Helm
 ## Images: Allow for tikZ figures in code blocks. They should have the following
    format:
 
-~~~ {#tikz caption='Caption' id='fig:id' tikzlibrary='items,to,go,in,\\usetikzlibrary{}'}
+~~~ {#tikz caption='My *great* caption' id='fig:id' tikzlibrary='items,to,go,in,\\usetikzlibrary{}'}
 
 [LaTeX code]
 
 ~~~
+
+Note that the caption can be formatted text in markdown.
 
 '''
 
@@ -69,7 +71,7 @@ from os import path, mkdir, chdir, getcwd
 from shutil import copyfile, rmtree
 from sys import getfilesystemencoding, stderr # Use `print(something, file=stderr)` for debugging
 from tempfile import mkdtemp
-from subprocess import call
+from subprocess import call, Popen, PIPE
 from hashlib import sha1
 
 IMAGE_PATH = '/Users/bennett/tmp/pandoc/Figures'
@@ -155,6 +157,13 @@ def tikz2image(tikz, filetype, outfile):
 	else:
 		call(['convert', '-density', '300', path.join(tmpdir, 'tikz.pdf'), '-quality', '100', outfile + '.' + filetype])
 	rmtree(tmpdir)
+
+def toFormat(string, fromThis, toThis):
+    # Process string through pandoc to get formatted JSON string. Is there a better way?
+    p1 = Popen(['echo'] + string.split(), stdout=PIPE)
+    p2 = Popen(['pandoc', '-f', fromThis, '-t', toThis], stdin=p1.stdout, stdout=PIPE)
+    p1.stdout.close()
+    return p2.communicate()[0].decode('utf-8').strip('\n')
 
 def latex(text):
 	return RawInline('latex', text)
@@ -333,7 +342,11 @@ def handle_comments(key, value, format, meta):
 				codeFooter = '\n\\end{document}\n'
 				tikz2image(codeHeader + code + codeFooter, filetype, outfile)
 				stderr.write('Created image ' + sourceFile + '\n')
-			return Para([Image((id, classes, attributes), [Str(caption)], [sourceFile, caption])])
+			if caption: # Need to run this through pandoc to get JSON representation so that captions can be formatted text.
+				jsonString = toFormat(caption, 'markdown', 'json')
+				formattedCaption = eval(jsonString)[1][0]['c']
+			else: formattedCaption = [Str('')]
+			return Para([Image((id, classes, attributes), formattedCaption, [sourceFile, caption])])
 	
 	
 	# Finally, if we're not in draft mode and we're reading a block comment or 
