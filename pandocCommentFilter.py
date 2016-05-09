@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#!/opt/local/bin/python
 
 '''
 Pandoc filter to extend the use of RawInline and RawBlocks to highlight 
 or comment on text. In draft mode, both are displayed in red; in 
 non-draft mode, only highlights are displayed, and that only in black.
 
-Copyright (C) 2015 Bennett Helm 
+Copyright (C) 2016 Bennett Helm 
 
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -66,20 +66,16 @@ Note that the caption can be formatted text in markdown.
 
 '''
 
-from pandocfilters import toJSONFilter, RawInline, Para, Plain, Image, Str
+
+from panflute import toJSONFilter, convert_text, stringify, shell, MetaInlines, RawBlock, CodeBlock, RawInline, Plain, Para, Str, Space, Image
 from os import path, mkdir, chdir, getcwd
 from shutil import copyfile, rmtree
 from sys import getfilesystemencoding, stderr # Use `print(something, file=stderr)` for debugging
 from tempfile import mkdtemp
-from subprocess import call, Popen, PIPE
 from hashlib import sha1
 
 IMAGE_PATH = '/Users/bennett/tmp/pandoc/Figures'
 DEFAULT_FONT = 'MinionPro'
-
-BLOCK_STATUS = []
-INLINE_STATUS = []
-HIGHLIGHT_STATUS = False
 
 colors = {
 	'<!comment>': 'red', 
@@ -150,26 +146,19 @@ def tikz2image(tikz, filetype, outfile):
 	f = open('tikz.tex', 'w')
 	f.write(tikz)
 	f.close()
-	p = call(['pdflatex', 'tikz.tex'], stdout=stderr)
+	p = shell(['pdflatex', 'tikz.tex'])
 	chdir(olddir)
 	if filetype == 'pdf':
 		copyfile(path.join(tmpdir, 'tikz.pdf'), outfile + '.' + filetype)
 	else:
-		call(['convert', '-density', '300', path.join(tmpdir, 'tikz.pdf'), '-quality', '100', outfile + '.' + filetype])
+		a = shell(['convert', '-density', '300', path.join(tmpdir, 'tikz.pdf'), '-quality', '100', outfile + '.' + filetype])
 	rmtree(tmpdir)
 
-def toFormat(string, fromThis, toThis):
-    # Process string through pandoc to get formatted JSON string. Is there a better way?
-    p1 = Popen(['echo'] + string.split(), stdout=PIPE)
-    p2 = Popen(['pandoc', '-f', fromThis, '-t', toThis], stdin=p1.stdout, stdout=PIPE)
-    p1.stdout.close()
-    return p2.communicate()[0].decode('utf-8').strip('\n')
-
 def latex(text):
-	return RawInline('latex', text)
+	return RawInline(text, 'latex')
 
 def html(text):
-	return RawInline('html', text)
+	return RawInline(text, 'html')
 	
 def closeHtmlSpan(oldInlineStatus):
 	if oldInlineStatus in ['<comment>', '<highlight>', '<fixme>']: return '</span>'
@@ -179,182 +168,181 @@ def closeHtmlDiv(oldBlockStatus):
 	if oldBlockStatus in ['<!comment>']: return '</div>'
 	else: return ''
 
-def handle_comments(key, value, format, meta):
-	global BLOCK_STATUS, INLINE_STATUS, HIGHLIGHT_STATUS
+def prepare(doc):
+	doc.blockStatus = []
+	doc.inlineStatus = []
+	doc.highlightStatus = False
+
+def handle_comments(elem, doc):
 	
 	# If translating to markdown, leave everything alone.
-	if format == 'markdown': return
+	if doc.format == 'markdown': return
 	
 	# Get draft status from metadata field (or assume not draft if there's no such field)
-	try: draft = meta['draft']['c']
-	except KeyError: draft = False
+	draft = doc.get_metadata('draft', default=False)
 	
-	# Check to see if we're changing BLOCK_STATUS...
-	if key == 'RawBlock':
-		type, tag = value
-		if type != 'html': pass
-		tag = tag.lower()
+	# Check to see if we're changing doc.blockStatus...
+	if isinstance(elem, RawBlock):
+		if elem.format != 'html': pass
+		tag = elem.text.lower()
 		if tag in ['<!comment>', '<center>']:
-			BLOCK_STATUS.append(tag)
-			if not draft and format != 'revealjs' and tag not in ['<center>']: return []
-			elif format == 'latex':
-				if HIGHLIGHT_STATUS: return Para([latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>'])])
-				else: return Para([latex(latexText[tag])])
-			elif format[:4] == 'html' or (format == 'revealjs' and tag == '<!highlight>'):
-				return Plain([html(htmlText[tag])])
-			elif format == 'revealjs':
-				return Plain([html(revealjsText[tag])])
+			doc.blockStatus.append(tag)
+			if not draft and doc.format != 'revealjs' and tag == '<!comment>': return []
+			elif doc.format == 'latex':
+				if doc.highlightStatus: return Para(latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>']))
+				else: return Para(latex(latexText[tag]))
+			elif doc.format in ['html', 'html5'] or (doc.format == 'revealjs' and tag == '<!highlight>'):
+				return Plain(html(htmlText[tag]))
+			elif doc.format == 'revealjs':
+				return Plain(html(revealjsText[tag]))
 			else: return []
 			
 		elif tag in ['</!comment>', '</center>']:
-			currentBlockStatus = BLOCK_STATUS.pop()
+			currentBlockStatus = doc.blockStatus.pop()
 			if currentBlockStatus[1:] == tag[2:]: # If we have a matching closing tag...
-				if not draft and tag not in ['</center>']: return []
-				if format == 'latex':
+				if not draft and tag == '</!comment>': return []
+				if doc.format == 'latex':
 					preText = ''
-					if BLOCK_STATUS: tag = BLOCK_STATUS[-1] # Switch back to previous
-					if HIGHLIGHT_STATUS: return Para([latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>'])])
-					else: return Para([latex(latexText[tag])])
-				elif format[0:4] == 'html':
-					return Plain([html(htmlText[tag])])
-				elif format == 'revealjs':
-					return Plain([html(revealjsText[tag])])
+					if doc.blockStatus: tag = doc.blockStatus[-1] # Switch back to previous
+					if doc.highlightStatus: return Para(latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>']))
+					else: return Para(latex(latexText[tag]))
+				elif doc.format in ['html', 'html5']:
+					return Plain(html(htmlText[tag]))
+				elif doc.format == 'revealjs':
+					return Plain(html(revealjsText[tag]))
 				else: return []
-			else: exit(1) # TODO Is this the right thing to do?
-		elif tag in ['<!box>', '</!box>'] and not(draft == False and '<!comment>' in BLOCK_STATUS):
+			else: exit(1) # No matching opening tag. TODO: Is this the right thing to do?
+		elif tag in ['<!box>', '</!box>'] and not(draft == False and '<!comment>' in doc.blockStatus):
 			# Note that when the box is nested inside a `<!comment>` block and 
 			# draft == False, I want no box at all. The above conditional does this.
-			if format == 'latex': return Para([latex(latexText[tag])])
-			elif format[:4] == 'html': return Plain([html(htmlText[tag])])
-			elif format == 'revealjs': return Plain([html(revealjsText[tag])])
+			if doc.format == 'latex': return Para(latex(latexText[tag]))
+			elif doc.format in ['html', 'html5']: return Plain(html(htmlText[tag]))
+			elif doc.format == 'revealjs': return Plain(html(revealjsText[tag]))
 			else: return [] # TODO Is this the right thing to do?
 			
-	# Then check to see if we're changing INLINE_STATUS...
-	elif key == 'RawInline':
-		type, tag = value
-		if type != 'html': pass
-		tag = tag.lower()
+	# Then check to see if we're changing doc.inlineStatus...
+	elif isinstance(elem, RawInline):
+		if elem.format != 'html': pass
+		tag = elem.text.lower()
 		
 		if tag == '<highlight>': # Highlight needs to be handled separately (and cannot have text color changed inside the highlighting).
-			if HIGHLIGHT_STATUS == True: return
-			HIGHLIGHT_STATUS = True
-			if format in ['latex', 'beamer']:
+			if doc.highlightStatus == True: return
+			doc.highlightStatus = True
+			if doc.format in ['latex', 'beamer']:
 				return latex(latexText[tag])
-			elif format in ['html', 'html5', 'revealjs']:
+			elif doc.format in ['html', 'html5', 'revealjs']:
 				return html(htmlText[tag])
 			else: return []
 		elif tag == '</highlight>':
-			if HIGHLIGHT_STATUS == False: return
-			HIGHLIGHT_STATUS = False
-			if format in ['latex', 'beamer']:
+			if doc.highlightStatus == False: return
+			doc.highlightStatus = False
+			if doc.format in ['latex', 'beamer']:
 				newText = latexText[tag]
 				return latex(newText)
-			elif format in ['html', 'html5', 'revealjs']: return html(htmlText[tag])
+			elif doc.format in ['html', 'html5', 'revealjs']: return html(htmlText[tag])
 		elif tag in ['<margin>', '<comment>', '<fixme>']:
-			INLINE_STATUS.append(tag)
+			doc.inlineStatus.append(tag)
 			if not draft: return []
-			elif format in ['latex', 'beamer']:
-				if HIGHLIGHT_STATUS: return latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>'])
+			elif doc.format in ['latex', 'beamer']:
+				if doc.highlightStatus: return latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>'])
 				else: return latex(latexText[tag])
-			elif format in ['html', 'html5', 'revealjs']:
+			elif doc.format in ['html', 'html5', 'revealjs']:
 				return html(htmlText[tag])
 			else: return []
 		
 		elif tag in ['</margin>', '</comment>', '</fixme>']:
-			currentInlineStatus = INLINE_STATUS.pop()
+			currentInlineStatus = doc.inlineStatus.pop()
 			if currentInlineStatus[1:] == tag[2:]: # If we have a matching closing tag...
 				if not draft: return []
-				elif format in ['latex', 'beamer']:
+				elif doc.format in ['latex', 'beamer']:
 					preText = ''
 					postText = ''
-					if HIGHLIGHT_STATUS: 
+					if doc.highlightStatus: 
 						preText = latexText['</highlight>']
 						postText = latexText['<highlight>']
-					if INLINE_STATUS: # Need to switch back to previous inline ...
-						if INLINE_STATUS[-1] == '<margin>': newText = latexText['<comment>'] # TODO Need to find a more general solution that works for `<fixme>` as well.
-						else: newText = latexText[INLINE_STATUS[-1]]
+					if doc.inlineStatus: # Need to switch back to previous inline ...
+						if doc.inlineStatus[-1] == '<margin>': newText = latexText['<comment>'] # TODO Need to find a more general solution that works for `<fixme>` as well.
+						else: newText = latexText[doc.inlineStatus[-1]]
 						if tag == '</margin>': newText = latexText[tag] + newText # Need to close the margin environment before switching back
-					elif BLOCK_STATUS: 
-						newText = latexText[BLOCK_STATUS[-1]] # ... or to previous block
+					elif doc.blockStatus and doc.blockStatus[-1] != '<center>': 
+						newText = latexText[doc.blockStatus[-1]] # ... or to previous block
 						if tag == '</margin>': newText = latexText[tag] + newText # Need to close the margin environment before switching back
 					else: newText = latexText[tag]
 					return latex(preText + newText + postText)
-				elif format in ['html', 'html5', 'revealjs']: return html(htmlText[tag])
-			else: exit(1) # TODO Is this the right thing to do?
+				elif doc.format in ['html', 'html5', 'revealjs']: return html(htmlText[tag])
+			else: exit(1) # Closing tag without opening tag. TODO: Is this the right thing to do?
 		
 		elif tag.startswith('<i ') and tag.endswith('>'): # Index
 			indexText = tag[3:-1]
-			if format == 'latex': return latex('\\index{' + indexText + '}')
+			if doc.format == 'latex': return latex('\\index{' + indexText + '}')
 			else: return []
 			
 		elif tag.startswith('<l ') and tag.endswith('>'): # My definition of a label
 			label = tag[3:-1]
-			if format == 'latex': return latex('\\label{' + label + '}')
-			elif format[0:4] == 'html': return html('<a name="' + label + '"></a>')
+			if doc.format == 'latex': return latex('\\label{' + label + '}')
+			elif doc.format in ['html', 'html5']: return html('<a name="' + label + '"></a>')
 			
 		elif tag.startswith('<r ') and tag.endswith('>'): # My definition of a reference
 			label = tag[3:-1]
-			if format == 'latex': return latex('\\cref{' + label + '}')
-			elif format[0:4] == 'html': return html('<a href="#' + label + '">here</a>')
+			if doc.format == 'latex': return latex('\\cref{' + label + '}')
+			elif doc.format in ['html', 'html5']: return html('<a href="#' + label + '">here</a>')
 			
 		elif tag.startswith('<rp ') and tag.endswith('>'): # My definition of a page reference
 			label = tag[4:-1]
-			if format == 'latex': return latex('\\cpageref{' + label + '}')
-			elif format[0:4] == 'html': return html('<a href="#' + label + '">here</a>')
+			if doc.format == 'latex': return latex('\\cpageref{' + label + '}')
+			elif doc.format in ['html', 'html5']: return html('<a href="#' + label + '">here</a>')
 	
 	# Check some cases at beginnings of paragraphs
-	elif key == 'Para':
+	elif isinstance(elem, Para):
 		try:
 			# If translating to LaTeX, beginning a paragraph with '<'
 			# will cause '\noindent{}' to be output first.
-			if value[0]['t'] == 'Str' and value[0]['c'] == '<' and value[1]['t'] == 'Space': 
-				if format == 'latex': return Para([latex('\\noindent{}')] + value[2:])
-				elif format[0:4] == 'html': return [Plain([html('<div class="noindent"></div>')]), Para(value[2:])]
-				else: return Para(value[2:])
-			
+			if isinstance(elem.content[0], Str) and elem.content[0].text == '<' and isinstance(elem.content[1], Space):
+				if doc.format == 'latex':
+					return Para(latex('\\noindent{}'), *elem.content[2:])
+				elif doc.format in ['html', 'html5']:
+					return Para(html('<div class="noindent">'), *elem.content[2:], html('</div>'))
+				else: return Para(*elem.content[2:])
+
 		except: pass # May happen if the paragraph is empty.
 	
 	
 	# Check for tikz CodeBlock. If it exists, try typesetting figure
-	elif key == 'CodeBlock':
-		(id, classes, attributes), code = value
-		if 'tikz' in classes or '\\begin{tikzpicture}' in code:
-			outfile = path.join(IMAGE_PATH, my_sha1(code))
-			filetype = 'png' # Default extension (without '.')
-			if format == 'latex': filetype = 'pdf'
+	elif isinstance(elem, CodeBlock):
+		if 'tikz' in elem.classes or '\\begin{tikzpicture}' in elem.text:
+			font = doc.get_metadata('fontfamily', default=None)
+			if type(font) == MetaInlines: font = stringify(*font.content)
+			else: font = DEFAULT_FONT
+			outfile = path.join(IMAGE_PATH, my_sha1(elem.text + font))
+			if doc.format == 'latex': filetype = 'pdf' # (without '.')
+			else: filetype = 'png' # Default extension (without '.')
 			sourceFile = outfile + '.' + filetype
 			caption = ''
 			library = ''
-			font = ''
-			for a, b in attributes:
-				if a == 'caption': caption = b
-				elif a == 'tikzlibrary': library = b
+			if 'caption' in elem.attributes: caption = elem.attributes['caption']
+			if 'tikzlibrary' in elem.attributes: library = elem.attributes['tikzlibrary']
 			if not path.isfile(sourceFile):
 				try:
 					mkdir(IMAGE_PATH)
 					stderr.write('Created directory ' + IMAGE_PATH + '\n')
 				except OSError: pass
-				if 'fontfamily' in meta: font = meta['fontfamily']['c'][0]['c']
-				else: font = DEFAULT_FONT
 				codeHeader = '\\documentclass{standalone}\n\\usepackage{' + font + '}\n\\usepackage{tikz}\n'
 				if library: codeHeader += '\\usetikzlibrary{' + library + '}\n'
 				codeHeader += '\\begin{document}\n'
 				codeFooter = '\n\\end{document}\n'
-				tikz2image(codeHeader + code + codeFooter, filetype, outfile)
+				tikz2image(codeHeader + elem.text + codeFooter, filetype, outfile)
 				stderr.write('Created image ' + sourceFile + '\n')
-			if caption: # Need to run this through pandoc to get JSON representation so that captions can be formatted text.
-				jsonString = toFormat(caption, 'markdown', 'json')
-				formattedCaption = eval(jsonString)[1][0]['c']
-			else: formattedCaption = [Str('')]
-			return Para([Image((id, classes, attributes), formattedCaption, [sourceFile, caption])])
+			if caption: formattedCaption = convert_text(caption)
+			else: formattedCaption = Str('')
+			return Para(Image(*formattedCaption[0].content, url=sourceFile, title=caption, identifier=elem.identifier, classes=elem.classes, attributes=elem.attributes), Str(str(font)))
 	
 	
 	# Finally, if we're not in draft mode and we're reading a block comment or 
 	# an inline comment or margin note, then suppress output.
-	elif '<!comment>' in BLOCK_STATUS and not draft and format != 'revealjs': return []
-	elif '<comment>' in INLINE_STATUS and not draft: return []
-	elif '<margin>' in INLINE_STATUS and not draft: return []
+	elif '<!comment>' in doc.blockStatus and not draft and doc.format != 'revealjs': return []
+	elif '<comment>' in doc.inlineStatus and not draft: return []
+	elif '<margin>' in doc.inlineStatus and not draft: return []
 
 
 if __name__ == "__main__":
-  toJSONFilter(handle_comments)
+  toJSONFilter(handle_comments, prepare)
