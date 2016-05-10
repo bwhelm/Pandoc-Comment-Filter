@@ -67,10 +67,10 @@ Note that the caption can be formatted text in markdown.
 '''
 
 
-from panflute import toJSONFilter, convert_text, stringify, shell, MetaInlines, RawBlock, CodeBlock, RawInline, Plain, Para, Str, Space, Image
+from panflute import toJSONFilter, convert_text, stringify, shell, debug, MetaInlines, RawBlock, CodeBlock, RawInline, Plain, Para, Str, Space, Image
 from os import path, mkdir, chdir, getcwd
 from shutil import copyfile, rmtree
-from sys import getfilesystemencoding, stderr # Use `print(something, file=stderr)` for debugging
+from sys import getfilesystemencoding
 from tempfile import mkdtemp
 from hashlib import sha1
 
@@ -84,22 +84,21 @@ colors = {
 	'<margin>': 'red',
 	'<fixme>': 'cyan',
 }
-endColor = '\\color{black}{}'
 marginStyle = 'max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;' # HTML style for margin notes
 
 latexText = {
 	'<!comment>': '\\color{' + colors['<!comment>'] + '}{}',
-	'</!comment>': endColor,
+	'</!comment>': '\\color{black}{}',
 	'<!box>': '\\medskip\\noindent\\fbox{\\begin{minipage}[t]{0.98\\columnwidth}',
 	'</!box>': '\\end{minipage}}\medskip{}',
 	'<comment>': '\\color{' + colors['<comment>'] + '}{}',
-	'</comment>': endColor,
+	'</comment>': '',
 	'<highlight>': '\\hl{',
 	'</highlight>': '}',
 	'<margin>': '\\marginpar{\\footnotesize{\\color{' + colors['<margin>'] + '}{}',
 	'</margin>': '}}',
 	'<fixme>': '\\marginpar{\\footnotesize{\\color{' + colors['<fixme>'] + '}{}Fix this!}}\\color{' + colors['<fixme>'] + '}{}',
-	'</fixme>': endColor,
+	'</fixme>': '',
 	'<center>': '\\begin{center}', # TODO Need to figure out what to do for beamer!
 	'</center>': '\\end{center}',
 }
@@ -119,19 +118,19 @@ htmlText = {
 	'<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
 	'</!box>': '</div>',
 }
-revealjsText = { # TODO Fill this out where needed!
+revealjsText = {
 	'<!comment>': '<aside class="notes">',
 	'</!comment>': '</aside>',
 	'<comment>': '<span style="color: ' + colors['<comment>'] + ';">',
 	'</comment>': '</span>',
 	'<highlight>': '<mark>',
 	'</highlight>': '</mark>',
-	'<margin>': '',
-	'</margin>': '',
-	'<fixme>': '',
-	'</fixme>': '',
-	'<center>': '',
-	'</center>': '',
+	'<margin>': '<span style="color: ' + colors['<margin>'] + '; ' + marginStyle + '">',
+	'</margin>': '</span>',
+	'<fixme>': '<span style="color: ' + colors['<fixme>'] + '; ' + marginStyle + '">Fix this!</span><span style="color: ' + colors['<fixme>'] + ';">',
+	'</fixme>': '</span>',
+	'<center>': '<div style="text-align:center";>',
+	'</center>': '</div>',
 	'<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
 	'</!box>': '</div>',
 }
@@ -169,9 +168,12 @@ def closeHtmlDiv(oldBlockStatus):
 	else: return ''
 
 def prepare(doc):
-	doc.blockStatus = []
-	doc.inlineStatus = []
-	doc.highlightStatus = False
+	doc.inlineTagStack = []
+	doc.blockComment = False
+	doc.inlineComment = False
+	doc.inlineMargin = False
+	doc.inlineHighlight = False
+	doc.inlineFontColorStack = ['black']
 
 def handle_comments(elem, doc):
 	
@@ -181,96 +183,116 @@ def handle_comments(elem, doc):
 	# Get draft status from metadata field (or assume not draft if there's no such field)
 	draft = doc.get_metadata('draft', default=False)
 	
-	# Check to see if we're changing doc.blockStatus...
+	# Check to see if we're starting or closing a Block element
 	if isinstance(elem, RawBlock):
-		if elem.format != 'html': pass
+		if elem.format != 'html': return
+		
 		tag = elem.text.lower()
-		if tag in ['<!comment>', '<center>']:
-			doc.blockStatus.append(tag)
-			if not draft and doc.format != 'revealjs' and tag == '<!comment>': return []
-			elif doc.format == 'latex':
-				if doc.highlightStatus: return Para(latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>']))
-				else: return Para(latex(latexText[tag]))
-			elif doc.format in ['html', 'html5'] or (doc.format == 'revealjs' and tag == '<!highlight>'):
-				return Plain(html(htmlText[tag]))
-			elif doc.format == 'revealjs':
-				return Plain(html(revealjsText[tag]))
-			else: return []
-			
-		elif tag in ['</!comment>', '</center>']:
-			currentBlockStatus = doc.blockStatus.pop()
-			if currentBlockStatus[1:] == tag[2:]: # If we have a matching closing tag...
-				if not draft and tag == '</!comment>': return []
-				if doc.format == 'latex':
-					preText = ''
-					if doc.blockStatus: tag = doc.blockStatus[-1] # Switch back to previous
-					if doc.highlightStatus: return Para(latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>']))
-					else: return Para(latex(latexText[tag]))
-				elif doc.format in ['html', 'html5']:
-					return Plain(html(htmlText[tag]))
-				elif doc.format == 'revealjs':
-					return Plain(html(revealjsText[tag]))
-				else: return []
-			else: exit(1) # No matching opening tag. TODO: Is this the right thing to do?
-		elif tag in ['<!box>', '</!box>'] and not(draft == False and '<!comment>' in doc.blockStatus):
-			# Note that when the box is nested inside a `<!comment>` block and 
-			# draft == False, I want no box at all. The above conditional does this.
-			if doc.format == 'latex': return Para(latex(latexText[tag]))
+		
+		if not draft:
+			if doc.blockComment: # Need to suppress output
+				if tag == '</!comment>': doc.blockComment = False
+				return []
+		
+		# Not currently suppressing output ...
+		
+		if tag in ['<!comment>', '<!box>', '<center>', '<!speaker>']:
+			if tag == '<!comment>': 
+				doc.blockComment = True
+				if not draft: return []
+			if doc.format == 'latex': return Para(latex(latexText[tag])) # FIXME: What about beamer?
 			elif doc.format in ['html', 'html5']: return Plain(html(htmlText[tag]))
 			elif doc.format == 'revealjs': return Plain(html(revealjsText[tag]))
-			else: return [] # TODO Is this the right thing to do?
-			
-	# Then check to see if we're changing doc.inlineStatus...
-	elif isinstance(elem, RawInline):
-		if elem.format != 'html': pass
+			else: return
+		elif tag in ['</!comment>', '</!box>', '</center>', '</!speaker>']:
+			if doc.inlineTagStack:
+				debug('Need to close all inline elements before closing block elements!\n\n' + str(doc.inlineTagStack) + '\n\nbefore\n\n' + tag + '\n\n')
+				exit(1)
+			if tag == '</!comment>':
+				doc.blockComment = False
+				if not draft: return []
+			if doc.format == 'latex': return Para(latex(latexText[tag])) # FIXME: What about beamer?
+			elif doc.format in ['html', 'html5']: return Plain(html(htmlText[tag]))
+			elif doc.format == 'revealjs': return Plain(html(revealjsText[tag]))
+			else: return
+		else: return # TODO Is this the right thing to do?
+	
+	if not draft and doc.blockComment: 
+		return [] # Need to suppress output
+	
+	# Then check to see if we're changing doc.inlineTagStack...
+	if isinstance(elem, RawInline):
+		if elem.format != 'html': return
+		
 		tag = elem.text.lower()
 		
-		if tag == '<highlight>': # Highlight needs to be handled separately (and cannot have text color changed inside the highlighting).
-			if doc.highlightStatus == True: return
-			doc.highlightStatus = True
-			if doc.format in ['latex', 'beamer']:
-				return latex(latexText[tag])
-			elif doc.format in ['html', 'html5', 'revealjs']:
-				return html(htmlText[tag])
-			else: return []
-		elif tag == '</highlight>':
-			if doc.highlightStatus == False: return
-			doc.highlightStatus = False
-			if doc.format in ['latex', 'beamer']:
-				newText = latexText[tag]
-				return latex(newText)
-			elif doc.format in ['html', 'html5', 'revealjs']: return html(htmlText[tag])
-		elif tag in ['<margin>', '<comment>', '<fixme>']:
-			doc.inlineStatus.append(tag)
-			if not draft: return []
-			elif doc.format in ['latex', 'beamer']:
-				if doc.highlightStatus: return latex(latexText['</highlight>'] + latexText[tag] + latexText['<highlight>'])
-				else: return latex(latexText[tag])
-			elif doc.format in ['html', 'html5', 'revealjs']:
-				return html(htmlText[tag])
-			else: return []
+		if not draft: # Check to see if need to suppress output
+			if doc.inlineComment: # Need to suppress output
+				if tag == '</comment>': doc.inlineComment = False
+				return []
+			elif doc.inlineMargin: # Need to suppress output
+				if tag == '</margin>': doc.inlineMargin = False
+				return []
 		
-		elif tag in ['</margin>', '</comment>', '</fixme>']:
-			currentInlineStatus = doc.inlineStatus.pop()
-			if currentInlineStatus[1:] == tag[2:]: # If we have a matching closing tag...
+		# Not currently suppressing output....
+		
+		if tag in ['<comment>', '<fixme>', '<margin>', '<highlight>', '</comment>', '</fixme>', '</margin>', '</highlight>']:
+			if doc.format in ['latex', 'beamer']: # LaTeX gets treated differently than HTML
+				preText = ''
+				postText = ''
+				if doc.inlineHighlight and tag != '</highlight>': # Cannot change colors within highlighting in LaTeX (but don't do anything when closing the highlight tag!)
+					preText = latexText['</highlight>']
+					postText = latexText['<highlight>']
+				if tag in ['<comment>', '<fixme>', '<margin>', '<highlight>']: # If any opening tag
+					if tag == '<comment>': 
+						doc.inlineComment = True
+						if not draft: return[]
+						doc.inlineFontColorStack.append(colors[tag])
+					elif tag == '<fixme>':
+						doc.inlineFontColorStack.append(colors[tag])
+					elif tag == '<margin>': 
+						doc.inlineMargin = True
+						if not draft: return[]
+						doc.inlineFontColorStack.append(colors[tag])
+					elif tag == '<highlight>': 
+						doc.inlineHighlight = True
+						doc.inlineFontColorStack.append(doc.inlineFontColorStack[-1])
+					doc.inlineTagStack.append(tag)
+					if not draft: return [] # Suppress output of the tag
+					return latex(preText + latexText[tag] + postText)
+				elif tag in ['</comment>', '</fixme>', '</margin>', '</highlight>']:
+					if tag == '</comment>': doc.inlineComment = False
+					elif tag == '</fixme>': pass
+					elif tag == '</margin>': doc.inlineMargin = False
+					elif tag == '</highlight>': doc.inlineHighlight = False
+					doc.inlineFontColorStack.pop()
+					previousColor = doc.inlineFontColorStack[-1]
+					currentInlineStatus = doc.inlineTagStack.pop()
+					if currentInlineStatus[1:] == tag[2:]: # We have a matching opening tag
+						if not draft: return [] # Suppress output of the tag
+						return latex(preText + latexText[tag] + '\\color{' + previousColor + '}{}' + postText)
+					else: 
+						debug('Closing tag (' + tag + ') does not match opening tag (' + currentInlineStatus + ').\n\n')
+#						debug(doc.inlineComment, doc.inlineMargin, doc.inlineHighlight, doc.inlineTagStack, doc.inlineFontColorStack, previousColor, previousTag, currentInlineStatus, preText, postText)
+						exit(1)
+			elif doc.format in ['html', 'html5']:
+				if tag == '<highlight>': doc.inlineHighlight = True
+				if tag == '</highlight>': doc.inlineHighlight = False
 				if not draft: return []
-				elif doc.format in ['latex', 'beamer']:
-					preText = ''
-					postText = ''
-					if doc.highlightStatus: 
-						preText = latexText['</highlight>']
-						postText = latexText['<highlight>']
-					if doc.inlineStatus: # Need to switch back to previous inline ...
-						if doc.inlineStatus[-1] == '<margin>': newText = latexText['<comment>'] # TODO Need to find a more general solution that works for `<fixme>` as well.
-						else: newText = latexText[doc.inlineStatus[-1]]
-						if tag == '</margin>': newText = latexText[tag] + newText # Need to close the margin environment before switching back
-					elif doc.blockStatus and doc.blockStatus[-1] != '<center>': 
-						newText = latexText[doc.blockStatus[-1]] # ... or to previous block
-						if tag == '</margin>': newText = latexText[tag] + newText # Need to close the margin environment before switching back
-					else: newText = latexText[tag]
-					return latex(preText + newText + postText)
-				elif doc.format in ['html', 'html5', 'revealjs']: return html(htmlText[tag])
-			else: exit(1) # Closing tag without opening tag. TODO: Is this the right thing to do?
+				if tag in ['<comment>', '<fixme>', '<margin>', '<highlight>']:
+					doc.inlineTagStack.append(tag)
+				else: doc.inlineTagStack.pop()
+				return html(htmlText[tag])
+			elif doc.format == 'revealjs': 
+				if tag == '<highlight>': doc.inlineHighlight = True
+				if tag == '</highlight>': doc.inlineHighlight = False
+				if not draft: return []
+				if tag in ['<comment>', '<fixme>', '<margin>', '<highlight>']:
+					doc.inlineTagStack.append(tag)
+				else: doc.inlineTagStack.pop()
+				return html(revealjsText[tag])
+		
+		elif not draft and (doc.inlineComment or doc.inlineMargin): return [] # Suppress all output
 		
 		elif tag.startswith('<i ') and tag.endswith('>'): # Index
 			indexText = tag[3:-1]
@@ -292,6 +314,8 @@ def handle_comments(elem, doc):
 			if doc.format == 'latex': return latex('\\cpageref{' + label + '}')
 			elif doc.format in ['html', 'html5']: return html('<a href="#' + label + '">here</a>')
 	
+	elif not draft and (doc.inlineComment or doc.inlineMargin): return [] # Suppress all output
+			
 	# Check some cases at beginnings of paragraphs
 	elif isinstance(elem, Para):
 		try:
@@ -324,25 +348,17 @@ def handle_comments(elem, doc):
 			if not path.isfile(sourceFile):
 				try:
 					mkdir(IMAGE_PATH)
-					stderr.write('Created directory ' + IMAGE_PATH + '\n')
+					debug('Created directory ' + IMAGE_PATH + '\n\n')
 				except OSError: pass
 				codeHeader = '\\documentclass{standalone}\n\\usepackage{' + font + '}\n\\usepackage{tikz}\n'
 				if library: codeHeader += '\\usetikzlibrary{' + library + '}\n'
 				codeHeader += '\\begin{document}\n'
 				codeFooter = '\n\\end{document}\n'
 				tikz2image(codeHeader + elem.text + codeFooter, filetype, outfile)
-				stderr.write('Created image ' + sourceFile + '\n')
+				debug('Created image ' + sourceFile + '\n\n')
 			if caption: formattedCaption = convert_text(caption)
 			else: formattedCaption = Str('')
 			return Para(Image(*formattedCaption[0].content, url=sourceFile, title=caption, identifier=elem.identifier, classes=elem.classes, attributes=elem.attributes), Str(str(font)))
-	
-	
-	# Finally, if we're not in draft mode and we're reading a block comment or 
-	# an inline comment or margin note, then suppress output.
-	elif '<!comment>' in doc.blockStatus and not draft and doc.format != 'revealjs': return []
-	elif '<comment>' in doc.inlineStatus and not draft: return []
-	elif '<margin>' in doc.inlineStatus and not draft: return []
 
 
-if __name__ == "__main__":
-  toJSONFilter(handle_comments, prepare)
+if __name__ == "__main__": toJSONFilter(handle_comments, prepare)
