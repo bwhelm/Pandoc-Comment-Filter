@@ -82,7 +82,7 @@ colors = {
 	'<comment>': 'red', 
 	'<highlight>': 'yellow',
 	'<margin>': 'red',
-	'<fixme>': 'cyan',
+	'<fixme>': 'cyan'
 }
 marginStyle = 'max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;' # HTML style for margin notes
 
@@ -101,6 +101,8 @@ latexText = {
 	'</fixme>': '',
 	'<center>': '\\begin{center}', # TODO Need to figure out what to do for beamer!
 	'</center>': '\\end{center}',
+	'<!speaker>': '\\color{' + colors['<!comment>'] + '}{}', # Note: treat this just like <!comment>
+	'</!speaker>': '\\color{black}{}'
 }
 htmlText = {
 	'<!comment>': '<div style="color: ' + colors['<!comment>'] + ';">',
@@ -117,10 +119,12 @@ htmlText = {
 	'</center>': '</div>',
 	'<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
 	'</!box>': '</div>',
+	'<!speaker>': '<div style="color: ' + colors['<!comment>'] + ';">', # Note: treat this just like <!comment>
+	'</!speaker>': '</div>'
 }
 revealjsText = {
-	'<!comment>': '<aside class="notes">',
-	'</!comment>': '</aside>',
+	'<!comment>': '<div style="color: ' + colors['<!comment>'] + ';">',
+	'</!comment>': '</div>',
 	'<comment>': '<span style="color: ' + colors['<comment>'] + ';">',
 	'</comment>': '</span>',
 	'<highlight>': '<mark>',
@@ -133,6 +137,8 @@ revealjsText = {
 	'</center>': '</div>',
 	'<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
 	'</!box>': '</div>',
+	'<!speaker>': '<aside class="notes">',
+	'</!speaker>': '</aside>'
 }
 
 def my_sha1(x):
@@ -158,14 +164,6 @@ def latex(text):
 
 def html(text):
 	return RawInline(text, 'html')
-	
-def closeHtmlSpan(oldInlineStatus):
-	if oldInlineStatus in ['<comment>', '<highlight>', '<fixme>']: return '</span>'
-	else: return ''
-
-def closeHtmlDiv(oldBlockStatus):
-	if oldBlockStatus in ['<!comment>']: return '</div>'
-	else: return ''
 
 def prepare(doc):
 	doc.inlineTagStack = []
@@ -200,6 +198,7 @@ def handle_comments(elem, doc):
 			if tag == '<!comment>': 
 				doc.blockComment = True
 				if not draft: return []
+				doc.inlineFontColorStack.append(colors[tag])
 			if doc.format == 'latex': return Para(latex(latexText[tag])) # FIXME: What about beamer?
 			elif doc.format in ['html', 'html5']: return Plain(html(htmlText[tag]))
 			elif doc.format == 'revealjs': return Plain(html(revealjsText[tag]))
@@ -211,14 +210,14 @@ def handle_comments(elem, doc):
 			if tag == '</!comment>':
 				doc.blockComment = False
 				if not draft: return []
+				doc.inlineFontColorStack.pop()
 			if doc.format == 'latex': return Para(latex(latexText[tag])) # FIXME: What about beamer?
 			elif doc.format in ['html', 'html5']: return Plain(html(htmlText[tag]))
 			elif doc.format == 'revealjs': return Plain(html(revealjsText[tag]))
 			else: return
 		else: return # TODO Is this the right thing to do?
 	
-	if not draft and doc.blockComment: 
-		return [] # Need to suppress output
+	if not draft and doc.blockComment: return [] # Need to suppress output
 	
 	# Then check to see if we're changing doc.inlineTagStack...
 	if isinstance(elem, RawInline):
@@ -227,7 +226,13 @@ def handle_comments(elem, doc):
 		tag = elem.text.lower()
 		
 		if not draft: # Check to see if need to suppress output
-			if doc.inlineComment: # Need to suppress output
+			if tag == '<comment>': 
+				doc.inlineComment = True
+				return []
+			elif tag == '<margin>': 
+				doc.inlineMargin = True
+				return []
+			elif doc.inlineComment: # Need to suppress output
 				if tag == '</comment>': doc.inlineComment = False
 				return []
 			elif doc.inlineMargin: # Need to suppress output
@@ -292,8 +297,6 @@ def handle_comments(elem, doc):
 				else: doc.inlineTagStack.pop()
 				return html(revealjsText[tag])
 		
-		elif not draft and (doc.inlineComment or doc.inlineMargin): return [] # Suppress all output
-		
 		elif tag.startswith('<i ') and tag.endswith('>'): # Index
 			indexText = tag[3:-1]
 			if doc.format == 'latex': return latex('\\index{' + indexText + '}')
@@ -335,11 +338,9 @@ def handle_comments(elem, doc):
 	elif isinstance(elem, CodeBlock):
 		if 'tikz' in elem.classes or '\\begin{tikzpicture}' in elem.text:
 			font = doc.get_metadata('fontfamily', default=None)
-			if type(font) == MetaInlines: font = stringify(*font.content)
-			else: font = DEFAULT_FONT
+			font = stringify(*font.content) if type(font) == MetaInlines else DEFAULT_FONT
 			outfile = path.join(IMAGE_PATH, my_sha1(elem.text + font))
-			if doc.format == 'latex': filetype = 'pdf' # (without '.')
-			else: filetype = 'png' # Default extension (without '.')
+			filetype = 'pdf' if doc.format == 'latex' else 'png' # (without '.' in extension)
 			sourceFile = outfile + '.' + filetype
 			caption = ''
 			library = ''
@@ -356,8 +357,7 @@ def handle_comments(elem, doc):
 				codeFooter = '\n\\end{document}\n'
 				tikz2image(codeHeader + elem.text + codeFooter, filetype, outfile)
 				debug('Created image ' + sourceFile + '\n\n')
-			if caption: formattedCaption = convert_text(caption)
-			else: formattedCaption = Str('')
+			formattedCaption = convert_text(caption) if caption else Str('')
 			return Para(Image(*formattedCaption[0].content, url=sourceFile, title=caption, identifier=elem.identifier, classes=elem.classes, attributes=elem.attributes), Str(str(font)))
 
 
