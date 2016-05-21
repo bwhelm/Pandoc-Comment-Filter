@@ -23,12 +23,14 @@ Copyright (C) 2016 Bennett Helm
 
 ## Block-Level Items:
 
-`<!comment>`:	begin comment block (or speaker notes for revealjs)
-`</!comment>`:	end comment block (or speaker notes for revealjs)
+`<!comment>`:	begin comment block
+`</!comment>`:	end comment block
 `<center>`:		begin centering
 `</center>`:	end centering
 `<!box>`:		begin frame box
 `</!box>`:		end frame box
+`<!speaker>`:	begin speaker notes (for revealjs)
+`</!speaker>`:	end speaker notes
 
 
 ## Inline Items:
@@ -71,11 +73,10 @@ from panflute import toJSONFilter, convert_text, stringify, shell, debug, MetaIn
 from os import path, mkdir, chdir, getcwd
 from shutil import copyfile, rmtree
 from sys import getfilesystemencoding
-from tempfile import mkdtemp
 from hashlib import sha1
 
 IMAGE_PATH = '/Users/bennett/tmp/pandoc/Figures'
-DEFAULT_FONT = 'MinionPro'
+DEFAULT_FONT = 'garamondx'
 
 colors = {
 	'<!comment>': 'red', 
@@ -87,51 +88,51 @@ colors = {
 marginStyle = 'max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;' # HTML style for margin notes
 
 latexText = {
-	'<!comment>': '\\color{' + colors['<!comment>'] + '}{}',
+	'<!comment>': '\\color{{{}}}{{}}'.format(colors['<!comment>']),
 	'</!comment>': '\\color{black}{}',
 	'<!box>': '\\medskip\\noindent\\fbox{\\begin{minipage}[t]{0.98\\columnwidth}',
 	'</!box>': '\\end{minipage}}\medskip{}',
-	'<comment>': '\\color{' + colors['<comment>'] + '}{}',
+	'<comment>': '\\color{{{}}}{{}}'.format(colors['<comment>']),
 	'</comment>': '',
 	'<highlight>': '\\hl{',
 	'</highlight>': '}',
-	'<margin>': '\\marginpar{\\footnotesize{\\color{' + colors['<margin>'] + '}{}',
+	'<margin>': '\\marginpar{{\\footnotesize{{\\color{{{}}}{{}}'.format(colors['<margin>']),
 	'</margin>': '}}',
-	'<fixme>': '\\marginpar{\\footnotesize{\\color{' + colors['<fixme>'] + '}{}Fix this!}}\\color{' + colors['<fixme>'] + '}{}',
+	'<fixme>': '\\marginpar{{\\footnotesize{{\\color{{{}}}{{}}Fix this!}}}}\\color{{{}}}{{}}'.format(colors['<fixme>'], colors['<fixme>']),
 	'</fixme>': '',
 	'<center>': '\\begin{center}', # TODO Need to figure out what to do for beamer!
 	'</center>': '\\end{center}',
-	'<!speaker>': '\\color{' + colors['<!comment>'] + '}{}', # Note: treat this just like <!comment>
+	'<!speaker>': '\\color{{{}}}{{}}'.format(colors['<!comment>']), # Note: treat this just like <!comment>
 	'</!speaker>': '\\color{black}{}'
 }
 htmlText = {
-	'<!comment>': '<div style="color: ' + colors['<!comment>'] + ';">',
+	'<!comment>': '<div style="color: {};">'.format(colors['<!comment>']),
 	'</!comment>': '</div>',
-	'<comment>': '<span style="color: ' + colors['<comment>'] + ';">',
+	'<comment>': '<span style="color: {};">'.format(colors['<comment>']),
 	'</comment>': '</span>',
 	'<highlight>': '<mark>',
 	'</highlight>': '</mark>',
-	'<margin>': '<span style="color: ' + colors['<margin>'] + '; ' + marginStyle + '">',
+	'<margin>': '<span style="color: {}; {}">'.format(colors['<margin>'], marginStyle),
 	'</margin>': '</span>',
-	'<fixme>': '<span style="color: ' + colors['<fixme>'] + '; ' + marginStyle + '">Fix this!</span><span style="color: ' + colors['<fixme>'] + ';">',
+	'<fixme>': '<span style="color: {}; {}">Fix this!</span><span style="color: {};">'.format(colors['<fixme>'], marginStyle, colors['<fixme>']),
 	'</fixme>': '</span>',
 	'<center>': '<div style="text-align:center";>',
 	'</center>': '</div>',
 	'<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
 	'</!box>': '</div>',
-	'<!speaker>': '<div style="color: ' + colors['<!comment>'] + ';">', # Note: treat this just like <!comment>
+	'<!speaker>': '<div style="color: {};">'.format(colors['<!comment>']), # Note: treat this just like <!comment>
 	'</!speaker>': '</div>'
 }
 revealjsText = {
-	'<!comment>': '<div style="color: ' + colors['<!comment>'] + ';">',
+	'<!comment>': '<div style="color: {};">'.format(colors['<!comment>']),
 	'</!comment>': '</div>',
-	'<comment>': '<span style="color: ' + colors['<comment>'] + ';">',
+	'<comment>': '<span style="color: {};">'.format(colors['<comment>']),
 	'</comment>': '</span>',
 	'<highlight>': '<mark>',
 	'</highlight>': '</mark>',
-	'<margin>': '<span style="color: ' + colors['<margin>'] + '; ' + marginStyle + '">',
+	'<margin>': '<span style="color: {}; {};">'.format(colors['<margin>'], marginStyle),
 	'</margin>': '</span>',
-	'<fixme>': '<span style="color: ' + colors['<fixme>'] + '; ' + marginStyle + '">Fix this!</span><span style="color: ' + colors['<fixme>'] + ';">',
+	'<fixme>': '<span style="color: {}; {}">Fix this!</span><span style="color: {};">'.format(colors['<fixme>'], marginStyle, colors['<fixme>']),
 	'</fixme>': '</span>',
 	'<center>': '<div style="text-align:center";>',
 	'</center>': '</div>',
@@ -145,6 +146,7 @@ def my_sha1(x):
 	return sha1(x.encode(getfilesystemencoding())).hexdigest()
 
 def tikz2image(tikz, filetype, outfile):
+	from tempfile import mkdtemp
 	tmpdir = mkdtemp()
 	olddir = getcwd()
 	chdir(tmpdir)
@@ -154,9 +156,9 @@ def tikz2image(tikz, filetype, outfile):
 	p = shell(['pdflatex', 'tikz.tex'])
 	chdir(olddir)
 	if filetype == 'pdf':
-		copyfile(path.join(tmpdir, 'tikz.pdf'), outfile + '.' + filetype)
+		copyfile(path.join(tmpdir, 'tikz.pdf'), '{}.pdf'.format(outfile))
 	else:
-		a = shell(['convert', '-density', '300', path.join(tmpdir, 'tikz.pdf'), '-quality', '100', outfile + '.' + filetype])
+		a = shell(['convert', '-density', '300', path.join(tmpdir, 'tikz.pdf'), '-quality', '100', '{}.{}'.format(outfile, filetype)])
 	rmtree(tmpdir)
 
 def latex(text):
@@ -205,7 +207,7 @@ def handle_comments(elem, doc):
 			else: return
 		elif tag in ['</!comment>', '</!box>', '</center>', '</!speaker>']:
 			if doc.inlineTagStack:
-				debug('Need to close all inline elements before closing block elements!\n\n' + str(doc.inlineTagStack) + '\n\nbefore\n\n' + tag + '\n\n')
+				debug('Need to close all inline elements before closing block elements!\n\n{}\n\nbefore\n\n{}\n\n'.format(str(doc.inlineTagStack), tag))
 				exit(1)
 			if tag == '</!comment>':
 				doc.blockComment = False
@@ -225,7 +227,7 @@ def handle_comments(elem, doc):
 		
 		tag = elem.text.lower()
 		
-		if not draft: # Check to see if need to suppress output
+		if not draft: # Check to see if need to suppress output. We do this only for `<comment>` and `<margin>` tags; with `<fixme>` and `<highlight>` tags, we merely suppress the tag.
 			if tag == '<comment>': 
 				doc.inlineComment = True
 				return []
@@ -238,6 +240,8 @@ def handle_comments(elem, doc):
 			elif doc.inlineMargin: # Need to suppress output
 				if tag == '</margin>': doc.inlineMargin = False
 				return []
+			elif tag in ['<fixme>', '<highlight>', '</fixme>', '</highlight>']:
+				return [] # Suppress the tag (but not the subsequent tagged text)
 		
 		# Not currently suppressing output....
 		
@@ -251,19 +255,19 @@ def handle_comments(elem, doc):
 				if tag in ['<comment>', '<fixme>', '<margin>', '<highlight>']: # If any opening tag
 					if tag == '<comment>': 
 						doc.inlineComment = True
-						if not draft: return[]
+#						if not draft: return[]
 						doc.inlineFontColorStack.append(colors[tag])
 					elif tag == '<fixme>':
 						doc.inlineFontColorStack.append(colors[tag])
 					elif tag == '<margin>': 
 						doc.inlineMargin = True
-						if not draft: return[]
+#						if not draft: return[]
 						doc.inlineFontColorStack.append(colors[tag])
 					elif tag == '<highlight>': 
 						doc.inlineHighlight = True
 						doc.inlineFontColorStack.append(doc.inlineFontColorStack[-1])
 					doc.inlineTagStack.append(tag)
-					if not draft: return [] # Suppress output of the tag
+#					if not draft: return [] # Suppress output of the tag
 					return latex(preText + latexText[tag] + postText)
 				elif tag in ['</comment>', '</fixme>', '</margin>', '</highlight>']:
 					if tag == '</comment>': doc.inlineComment = False
@@ -274,55 +278,46 @@ def handle_comments(elem, doc):
 					previousColor = doc.inlineFontColorStack[-1]
 					currentInlineStatus = doc.inlineTagStack.pop()
 					if currentInlineStatus[1:] == tag[2:]: # We have a matching opening tag
-						if not draft: return [] # Suppress output of the tag
-						return latex(preText + latexText[tag] + '\\color{' + previousColor + '}{}' + postText)
+#						if not draft: return [] # Suppress output of the tag
+						return latex('{}{}\\color{{{}}}{{}}{}'.format(preText, latexText[tag], previousColor, postText))
 					else: 
-						debug('Closing tag (' + tag + ') does not match opening tag (' + currentInlineStatus + ').\n\n')
+						debug('Closing tag ({}) does not match opening tag ({}).\n\n'.format(tag, currentInlineStatus))
 #						debug(doc.inlineComment, doc.inlineMargin, doc.inlineHighlight, doc.inlineTagStack, doc.inlineFontColorStack, previousColor, previousTag, currentInlineStatus, preText, postText)
 						exit(1)
-			elif doc.format in ['html', 'html5']:
-				if tag == '<highlight>': doc.inlineHighlight = True
-				if tag == '</highlight>': doc.inlineHighlight = False
-				if not draft: return []
+			else: # Some format other than LaTeX/beamer
+#				if not draft: return []
 				if tag in ['<comment>', '<fixme>', '<margin>', '<highlight>']:
+					if tag == '<highlight>': doc.inlineHighlight = True
 					doc.inlineTagStack.append(tag)
-				else: doc.inlineTagStack.pop()
-				return html(htmlText[tag])
-			elif doc.format == 'revealjs': 
-				if tag == '<highlight>': doc.inlineHighlight = True
-				if tag == '</highlight>': doc.inlineHighlight = False
-				if not draft: return []
-				if tag in ['<comment>', '<fixme>', '<margin>', '<highlight>']:
-					doc.inlineTagStack.append(tag)
-				else: doc.inlineTagStack.pop()
-				return html(revealjsText[tag])
+				else: 
+					if tag == '</highlight>': doc.inlineHighlight = False
+					doc.inlineTagStack.pop()
+				if doc.format in ['html', 'html5']: return html(htmlText[tag])
+				elif doc.format == 'revealjs': return html(revealjsText[tag])
+				else: return []
 		
 		elif tag.startswith('<i ') and tag.endswith('>'): # Index
-			indexText = tag[3:-1]
-			if doc.format == 'latex': return latex('\\index{' + indexText + '}')
+			if doc.format == 'latex': return latex('\\index{{{}}}'.format(tag[3:-1]))
 			else: return []
 			
 		elif tag.startswith('<l ') and tag.endswith('>'): # My definition of a label
-			label = tag[3:-1]
-			if doc.format == 'latex': return latex('\\label{' + label + '}')
-			elif doc.format in ['html', 'html5']: return html('<a name="' + label + '"></a>')
+			if doc.format == 'latex': return latex('\\label{{{}}}'.format(tag[3:-1]))
+			elif doc.format in ['html', 'html5']: return html('<a name="{}"></a>'.format(tag[3:-1]))
 			
 		elif tag.startswith('<r ') and tag.endswith('>'): # My definition of a reference
-			label = tag[3:-1]
-			if doc.format == 'latex': return latex('\\cref{' + label + '}')
-			elif doc.format in ['html', 'html5']: return html('<a href="#' + label + '">here</a>')
+			if doc.format == 'latex': return latex('\\cref{{{}}}'.format(tag[3:-1]))
+			elif doc.format in ['html', 'html5']: return html('<a href="#{}">here</a>'.format(tag[3:-1]))
 			
 		elif tag.startswith('<rp ') and tag.endswith('>'): # My definition of a page reference
-			label = tag[4:-1]
-			if doc.format == 'latex': return latex('\\cpageref{' + label + '}')
-			elif doc.format in ['html', 'html5']: return html('<a href="#' + label + '">here</a>')
+			if doc.format == 'latex': return latex('\\cpageref{{{}}}'.format(tag[4:-1]))
+			elif doc.format in ['html', 'html5']: return html('<a href="#{}">here</a>'.format(tag[4:-1]))
 	
 	elif not draft and (doc.inlineComment or doc.inlineMargin): return [] # Suppress all output
 			
 	# Check some cases at beginnings of paragraphs
 	elif isinstance(elem, Para):
 		try:
-			# If translating to LaTeX, beginning a paragraph with '<'
+			# If translating to LaTeX, beginning a paragraph with '< '
 			# will cause '\noindent{}' to be output first.
 			if isinstance(elem.content[0], Str) and elem.content[0].text == '<' and isinstance(elem.content[1], Space):
 				if doc.format == 'latex':
@@ -331,7 +326,7 @@ def handle_comments(elem, doc):
 					return Para(html('<div class="noindent">'), *elem.content[2:], html('</div>'))
 				else: return Para(*elem.content[2:])
 
-		except: pass # May happen if the paragraph is empty.
+		except: return # May happen if the paragraph is empty.
 	
 	
 	# Check for tikz CodeBlock. If it exists, try typesetting figure
@@ -342,21 +337,19 @@ def handle_comments(elem, doc):
 			outfile = path.join(IMAGE_PATH, my_sha1(elem.text + font))
 			filetype = 'pdf' if doc.format == 'latex' else 'png' # (without '.' in extension)
 			sourceFile = outfile + '.' + filetype
-			caption = ''
-			library = ''
-			if 'caption' in elem.attributes: caption = elem.attributes['caption']
-			if 'tikzlibrary' in elem.attributes: library = elem.attributes['tikzlibrary']
+			caption = elem.attributes['caption'] if 'caption' in elem.attributes else ''
+			library = elem.attributes['tikzlibrary'] if 'tikzlibrary' in elem.attributes else ''
 			if not path.isfile(sourceFile):
 				try:
 					mkdir(IMAGE_PATH)
-					debug('Created directory ' + IMAGE_PATH + '\n\n')
+					debug('Created directory {}\n\n'.format(IMAGE_PATH))
 				except OSError: pass
-				codeHeader = '\\documentclass{standalone}\n\\usepackage{' + font + '}\n\\usepackage{tikz}\n'
-				if library: codeHeader += '\\usetikzlibrary{' + library + '}\n'
+				codeHeader = '\\documentclass{{standalone}}\n\\usepackage{{{}}}\n\\usepackage{{tikz}}\n'.format(font)
+				if library: codeHeader += '\\usetikzlibrary{{{}}}\n'.format(library)
 				codeHeader += '\\begin{document}\n'
 				codeFooter = '\n\\end{document}\n'
 				tikz2image(codeHeader + elem.text + codeFooter, filetype, outfile)
-				debug('Created image ' + sourceFile + '\n\n')
+				debug('Created image {}\n\n'.format(sourceFile))
 			formattedCaption = convert_text(caption) if caption else Str('')
 			return Para(Image(*formattedCaption[0].content, url=sourceFile, title=caption, identifier=elem.identifier, classes=elem.classes, attributes=elem.attributes), Str(str(font)))
 
