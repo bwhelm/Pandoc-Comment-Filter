@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-'''
+"""
 Pandoc filter to extend the use of RawInline and RawBlocks to highlight
 or comment on text. In draft mode, both are displayed in red; in
 non-draft mode, only highlights are displayed, and that only in black.
@@ -68,18 +68,17 @@ Copyright (C) 2016 Bennett Helm
 
 Note that the caption can be formatted text in markdown.
 
-'''
+"""
 
-
-from pandocfilters import toJSONFilter, RawInline, Para, Plain, Image, Str
 from os import path, mkdir, chdir, getcwd
+from sys import getfilesystemencoding, stderr, stdout
 from shutil import copyfile, rmtree
-from sys import getfilesystemencoding, stderr
 from subprocess import call, Popen, PIPE
 from hashlib import sha1
+from pandocfilters import toJSONFilter, RawInline, Para, Plain, Image, Str
 
-IMAGE_PATH = '/Users/bennett/tmp/pandoc/Figures'
-DEFAULT_FONT = 'garamondx'
+IMAGE_PATH = path.expanduser('~/tmp/pandoc/Figures')
+DEFAULT_FONT = 'fbb'
 INLINE_TAG_STACK = []
 BLOCK_COMMENT = False
 INLINE_COMMENT = False
@@ -170,7 +169,7 @@ def tikz2image(tikz, filetype, outfile):
     f = open('tikz.tex', 'w')
     f.write(tikz)
     f.close()
-    p = call(['pdflatex', 'tikz.tex'], stdout=stderr)
+    p = call(['pdflatex', 'tikz.tex'], stdout=stdout)
     chdir(olddir)
     if filetype == '.pdf':
         copyfile(path.join(tmpdir, 'tikz.pdf'), outfile + filetype)
@@ -337,9 +336,9 @@ def handle_comments(key, value, docFormat, meta):
                     currentInlineStatus = INLINE_TAG_STACK.pop()
                     if currentInlineStatus[1:] == tag[2:]:
                         # matching opening tag
-                        return latex('{}{}\\color{{{}}}{{}}{}'.format(
-                                preText, LATEX_TEXT[tag], previousColor,
-                                postText))
+                        return latex('{}{}\\color{{{}}}{{}}{}'.format(preText,
+                                     LATEX_TEXT[tag], previousColor,
+                                     postText))
                     else:
                         debug('Closing tag ({}) does not match opening tag ({}).\n\n'.format(tag, currentInlineStatus))
                         exit(1)
