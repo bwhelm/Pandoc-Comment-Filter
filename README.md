@@ -10,7 +10,7 @@ you need to look at the raw version of this README.
 
 This is a Pandoc filter to extend the use of RawInline and RawBlocks to
 highlight or comment on text, as well as to create margin notes and "Fix
-ref!" tags. In draft mode, all comment types are displayed in various
+me!" tags. In draft mode, all comment types are displayed in various
 distinguishing colors; in non-draft mode, only highlights and boxes are
 displayed, and that only in black.
 

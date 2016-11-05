@@ -101,7 +101,7 @@ LATEX_TEXT = {
     '<!comment>': '\\color{{{}}}{{}}'.format(COLORS['<!comment>']),
     '</!comment>': '\\color{black}{}',
     '<!box>': '\\medskip\\noindent\\fbox{\\begin{minipage}[t]{0.98\\columnwidth}',
-    '</!box>': '\\end{minipage}}\medskip{}',
+    '</!box>': '\\end{minipage}}\\medskip{}',
     '<comment>': '\\color{{{}}}{{}}'.format(COLORS['<comment>']),
     '</comment>': '',
     '<highlight>': '\\hl{',
