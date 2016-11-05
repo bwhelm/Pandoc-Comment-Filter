@@ -71,7 +71,7 @@ Note that the caption can be formatted text in markdown.
 '''
 
 
-from pandocfilters import toJSONFilter, RawInline, Para, Plain, Image, Str
+from pandocfilters import toJSONFilter, walk, RawInline, Para, Plain, Image, Str
 from os import path, mkdir, chdir, getcwd
 from shutil import copyfile, rmtree
 from sys import getfilesystemencoding, stderr
@@ -103,18 +103,18 @@ LATEX_TEXT = {
     '</!comment>': '\\color{black}{}',
     '<!box>': '\\medskip\\noindent\\fbox{\\begin{minipage}[t]{0.98\\columnwidth}',
     '</!box>': '\\end{minipage}}\\medskip{}',
-    '<comment>': '\\color{{{}}}{{}}'.format(COLORS['<comment>']),
-    '</comment>': '',
+    '<comment>': '\\textcolor{{{}}}{{'.format(COLORS['<comment>']),
+    '</comment>': '}',
     '<highlight>': '\\hl{',
     '</highlight>': '}',
-    '<margin>': '\\marginpar{{\\footnotesize{{\\color{{{}}}{{}}'.format(COLORS['<margin>']),
-    '</margin>': '}}',
-    '<fixme>': '\\marginpar{{\\footnotesize{{\\color{{{}}}{{}}Fix this!}}}}\\color{{{}}}{{}}'.format(COLORS['<fixme>'], COLORS['<fixme>']),
-    '</fixme>': '',
+    '<margin>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}{{'.format(COLORS['<margin>']),
+    '</margin>': '}}}',
+    '<fixme>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}{{Fix this!}}}}}}\\textcolor{{{}}}{{'.format(COLORS['<fixme>'], COLORS['<fixme>']),
+    '</fixme>': '}',
     '<center>': '\\begin{center}',  # TODO Need to figure out what to do for beamer!
     '</center>': '\\end{center}',
-    '<!speaker>': '\\color{{{}}}{{}}'.format(COLORS['<!comment>']),  # Note: treat this just like <!comment>
-    '</!speaker>': '\\color{black}{}'
+    '<!speaker>': '\\textcolor{{{}}}{{'.format(COLORS['<!comment>']),  # Note: treat this just like <!comment>
+    '</!speaker>': '}'
 }
 HTML_TEXT = {
     '<!comment>': '<div style="color: {};">'.format(COLORS['<!comment>']),
@@ -155,7 +155,7 @@ REVEALJS_TEXT = {
 
 
 def debug(text):
-    stderr.write(text)
+    stderr.write("*****\n" + str(text) + "\n*****\n")
 
 
 def my_sha1(x):
@@ -199,7 +199,6 @@ def html(text):
 def handle_comments(key, value, docFormat, meta):
     global INLINE_TAG_STACK, BLOCK_COMMENT, INLINE_COMMENT, INLINE_MARGIN,\
         INLINE_HIGHLIGHT, INLINE_FONT_COLOR_STACK
-
     # If translating to markdown, leave everything alone.
     if docFormat == 'markdown':
         return
@@ -264,7 +263,73 @@ def handle_comments(key, value, docFormat, meta):
 
     if not draft and BLOCK_COMMENT:
         return []  # Need to suppress output
-
+    
+    # Rewriting comment code
+    elif key == 'Span':
+        [itemID, classes, keyValues], content = value
+        if "comment" in classes:
+            if draft:
+                if docFormat in ['latex', 'beamer']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [latex(LATEX_TEXT["<comment>"])] + newContent + [latex(LATEX_TEXT["</comment>"])]
+                elif docFormat in ['html', 'html5']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(HTML_TEXT["<comment>"])] + newContent + [html(HTML_TEXT["</comment>"])]
+                elif docFormat == 'revealjs':
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(REVEALJS_TEXT["<comment>"])] + newContent + [html(REVEALJS_TEXT["</comment>"])]
+                else:
+                    return content
+            else:
+                return []
+        elif "margin" in classes:
+            if draft:
+                if docFormat in ['latex', 'beamer']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [latex(LATEX_TEXT["<margin>"])] + newContent + [latex(LATEX_TEXT["</margin>"])]
+                elif docFormat in ['html', 'html5']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(HTML_TEXT["<margin>"])] + newContent + [html(HTML_TEXT["</margin>"])]
+                elif docFormat == 'revealjs':
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(REVEALJS_TEXT["<margin>"])] + newContent + [html(REVEALJS_TEXT["</margin>"])]
+                else:
+                    return content
+            else:
+                return []
+        elif "fixme" in classes:
+            if draft:
+                if docFormat in ['latex', 'beamer']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [latex(LATEX_TEXT["<fixme>"])] + newContent + [latex(LATEX_TEXT["</fixme>"])]
+                elif docFormat in ['html', 'html5']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(HTML_TEXT["<fixme>"])] + newContent + [html(HTML_TEXT["</fixme>"])]
+                elif docFormat == 'revealjs':
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(REVEALJS_TEXT["<fixme>"])] + newContent + [html(REVEALJS_TEXT["</fixme>"])]
+                else:
+                    return content
+            else:
+                return content
+        elif "highlight" in classes:
+            if draft:
+                if docFormat in ['latex', 'beamer']:
+                    # Note: Because of limitations of highlighting in LaTeX, can't
+                    #       nest any comments inside here: will get LaTeX error.
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [latex(LATEX_TEXT["<highlight>"])] + newContent + [latex(LATEX_TEXT["</highlight>"])]
+                elif docFormat in ['html', 'html5']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(HTML_TEXT["<highlight>"])] + newContent + [html(HTML_TEXT["</highlight>"])]
+                elif docFormat == 'revealjs':
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(REVEALJS_TEXT["<highlight>"])] + newContent + [html(REVEALJS_TEXT["</highlight>"])]
+                else:
+                    return content
+            else:
+                return content
+    
     # Then check to see if we're changing INLINE_TAG_STACK...
     elif key == 'RawInline':
         elementFormat, tag = value
