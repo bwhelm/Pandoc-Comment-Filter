@@ -448,7 +448,10 @@ def handle_comments(key, value, docFormat, meta):
                 # Need to run this through pandoc to get JSON
                 # representation so that captions can be docFormatted text.
                 jsonString = toFormat(caption, 'markdown', 'json')
-                formattedCaption = eval(jsonString)[1][0]['c']
+                if "blocks" in jsonString:
+                    formattedCaption = eval(jsonString)["blocks"][0]['c']
+                else:  # old API
+                    formattedCaption = eval(jsonString)[1][0]['c']
             else:
                 formattedCaption = [Str('')]
             return Para([Image((id, classes, attributes), formattedCaption, [sourceFile, caption])])
