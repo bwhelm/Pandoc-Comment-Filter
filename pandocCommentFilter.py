@@ -35,15 +35,12 @@ Copyright (C) 2016 Bennett Helm
 
 ## Inline Items:
 
-`<comment>`:    begin commenting
-`</comment>`:   end commenting
-`<highlight>`:  begin highlighting (note that this requires that `soul.sty`
-                    be loaded in LaTeX)
-`</highlight>`: end highlighting
-`<fixme>`:      begin FixMe margin note (and highlighting)
-`</fixme>`:     end FixMe margin note (and highlighting)
-`<margin>`:     begin margin note
-`</margin>`:    end margin note
+`[...]{.comment}`:    make `...` be a comment
+`[...]{.highlight}`:  make `...` be highlighted (note that this requires that
+                         `soul.sty` be loaded in LaTeX)
+`[...]{.fixme}`:      make `...` be a FixMe margin note (with highlighting)
+`[...]{.margin}`:     make `...` be a margin note
+`[...]{.smcaps}`:       make `...` be in small caps
 
 
 ## Other Items:
@@ -70,12 +67,13 @@ Note that the caption can be formatted text in markdown.
 
 """
 
+
+from pandocfilters import toJSONFilter, walk, RawInline, Para, Plain, Image, Str
 from os import path, mkdir, chdir, getcwd
-from sys import getfilesystemencoding, stderr, stdout
 from shutil import copyfile, rmtree
+from sys import getfilesystemencoding, stderr
 from subprocess import call, Popen, PIPE
 from hashlib import sha1
-from pandocfilters import toJSONFilter, RawInline, Para, Plain, Image, Str
 
 IMAGE_PATH = path.expanduser('~/tmp/pandoc/Figures')
 DEFAULT_FONT = 'fbb'
@@ -102,18 +100,20 @@ LATEX_TEXT = {
     '</!comment>': '\\color{black}{}',
     '<!box>': '\\medskip\\noindent\\fbox{\\begin{minipage}[t]{0.98\\columnwidth}',
     '</!box>': '\\end{minipage}}\\medskip{}',
-    '<comment>': '\\color{{{}}}{{}}'.format(COLORS['<comment>']),
-    '</comment>': '',
+    '<comment>': '\\textcolor{{{}}}{{'.format(COLORS['<comment>']),
+    '</comment>': '}',
     '<highlight>': '\\hl{',
     '</highlight>': '}',
-    '<margin>': '\\marginpar{{\\footnotesize{{\\color{{{}}}{{}}'.format(COLORS['<margin>']),
-    '</margin>': '}}',
-    '<fixme>': '\\marginpar{{\\footnotesize{{\\color{{{}}}{{}}Fix this!}}}}\\color{{{}}}{{}}'.format(COLORS['<fixme>'], COLORS['<fixme>']),
-    '</fixme>': '',
+    '<margin>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}{{'.format(COLORS['<margin>']),
+    '</margin>': '}}}',
+    '<fixme>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}{{Fix this!}}}}}}\\textcolor{{{}}}{{'.format(COLORS['<fixme>'], COLORS['<fixme>']),
+    '</fixme>': '}',
     '<center>': '\\begin{center}',  # TODO Need to figure out what to do for beamer!
     '</center>': '\\end{center}',
-    '<!speaker>': '\\color{{{}}}{{}}'.format(COLORS['<!comment>']),  # Note: treat this just like <!comment>
-    '</!speaker>': '\\color{black}{}'
+    '<!speaker>': '\\textcolor{{{}}}{{'.format(COLORS['<!comment>']),  # Note: treat this just like <!comment>
+    '</!speaker>': '}',
+    '<smcaps>': '\\textsc{',
+    '</smcaps>': '}'
 }
 HTML_TEXT = {
     '<!comment>': '<div style="color: {};">'.format(COLORS['<!comment>']),
@@ -131,7 +131,9 @@ HTML_TEXT = {
     '<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
     '</!box>': '</div>',
     '<!speaker>': '<div style="color: {};">'.format(COLORS['<!comment>']),  # Note: treat this just like <!comment>
-    '</!speaker>': '</div>'
+    '</!speaker>': '</div>',
+    '<smcaps>': '<span style="font-variant: small-caps;">',
+    '</smcaps>': '</span>'
 }
 REVEALJS_TEXT = {
     '<!comment>': '<div style="color: {};">'.format(COLORS['<!comment>']),
@@ -149,12 +151,14 @@ REVEALJS_TEXT = {
     '<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
     '</!box>': '</div>',
     '<!speaker>': '<aside class="notes">',
-    '</!speaker>': '</aside>'
+    '</!speaker>': '</aside>',
+    '<smcaps>': '<span style="font-variant: small-caps;">',
+    '</smcaps>': '</span>'
 }
 
 
 def debug(text):
-    stderr.write(text)
+    stderr.write("*****\n" + str(text) + "\n*****\n")
 
 
 def my_sha1(x):
@@ -169,7 +173,7 @@ def tikz2image(tikz, filetype, outfile):
     f = open('tikz.tex', 'w')
     f.write(tikz)
     f.close()
-    p = call(['pdflatex', 'tikz.tex'], stdout=stdout)
+    p = call(['pdflatex', 'tikz.tex'], stdout=stderr)
     chdir(olddir)
     if filetype == '.pdf':
         copyfile(path.join(tmpdir, 'tikz.pdf'), outfile + filetype)
@@ -263,7 +267,89 @@ def handle_comments(key, value, docFormat, meta):
 
     if not draft and BLOCK_COMMENT:
         return []  # Need to suppress output
+    
+    # Rewriting comment code
+    elif key == 'Span':
+        [itemID, classes, keyValues], content = value
+        if "comment" in classes:
+            if draft:
+                if docFormat in ['latex', 'beamer']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [latex(LATEX_TEXT["<comment>"])] + newContent + [latex(LATEX_TEXT["</comment>"])]
+                elif docFormat in ['html', 'html5']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(HTML_TEXT["<comment>"])] + newContent + [html(HTML_TEXT["</comment>"])]
+                elif docFormat == 'revealjs':
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(REVEALJS_TEXT["<comment>"])] + newContent + [html(REVEALJS_TEXT["</comment>"])]
+                else:
+                    return content
+            else:
+                return []
+        elif "margin" in classes:
+            if draft:
+                if docFormat in ['latex', 'beamer']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [latex(LATEX_TEXT["<margin>"])] + newContent + [latex(LATEX_TEXT["</margin>"])]
+                elif docFormat in ['html', 'html5']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(HTML_TEXT["<margin>"])] + newContent + [html(HTML_TEXT["</margin>"])]
+                elif docFormat == 'revealjs':
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(REVEALJS_TEXT["<margin>"])] + newContent + [html(REVEALJS_TEXT["</margin>"])]
+                else:
+                    return content
+            else:
+                return []
+        elif "fixme" in classes:
+            if draft:
+                if docFormat in ['latex', 'beamer']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [latex(LATEX_TEXT["<fixme>"])] + newContent + [latex(LATEX_TEXT["</fixme>"])]
+                elif docFormat in ['html', 'html5']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(HTML_TEXT["<fixme>"])] + newContent + [html(HTML_TEXT["</fixme>"])]
+                elif docFormat == 'revealjs':
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(REVEALJS_TEXT["<fixme>"])] + newContent + [html(REVEALJS_TEXT["</fixme>"])]
+                else:
+                    return content
+            else:
+                return content
+        elif "highlight" in classes:
+            if draft:
+                if docFormat in ['latex', 'beamer']:
+                    # Note: Because of limitations of highlighting in LaTeX, can't
+                    #       nest any comments inside here: will get LaTeX error.
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [latex(LATEX_TEXT["<highlight>"])] + newContent + [latex(LATEX_TEXT["</highlight>"])]
+                elif docFormat in ['html', 'html5']:
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(HTML_TEXT["<highlight>"])] + newContent + [html(HTML_TEXT["</highlight>"])]
+                elif docFormat == 'revealjs':
+                    newContent = walk(content, handle_comments, docFormat, meta)
+                    return [html(REVEALJS_TEXT["<highlight>"])] + newContent + [html(REVEALJS_TEXT["</highlight>"])]
+                else:
+                    return content
+            else:
+                return content
+        elif "smcaps" in classes:
+            # Always show this---don't worry about draft status!
+            if docFormat in ['latex', 'beamer']:
+                newContent = walk(content, handle_comments, docFormat, meta)
+                return [latex(LATEX_TEXT["<smcaps>"])] + newContent + [latex(LATEX_TEXT["</smcaps>"])]
+            elif docFormat in ['html', 'html5']:
+                newContent = walk(content, handle_comments, docFormat, meta)
+                return [html(HTML_TEXT["<smcaps>"])] + newContent + [html(HTML_TEXT["</smcaps>"])]
+            elif docFormat == 'revealjs':
+                newContent = walk(content, handle_comments, docFormat, meta)
+                return [html(REVEALJS_TEXT["<smcaps>"])] + newContent + [html(REVEALJS_TEXT["</smcaps>"])]
+            else:
+                # FIXME: I should run this through a filter that capitalizes all
+                       # strings in `content`.
+                return content
 
+    
     # Then check to see if we're changing INLINE_TAG_STACK...
     elif key == 'RawInline':
         elementFormat, tag = value
@@ -336,9 +422,9 @@ def handle_comments(key, value, docFormat, meta):
                     currentInlineStatus = INLINE_TAG_STACK.pop()
                     if currentInlineStatus[1:] == tag[2:]:
                         # matching opening tag
-                        return latex('{}{}\\color{{{}}}{{}}{}'.format(preText,
-                                     LATEX_TEXT[tag], previousColor,
-                                     postText))
+                        return latex('{}{}\\color{{{}}}{{}}{}'.format(
+                                preText, LATEX_TEXT[tag], previousColor,
+                                postText))
                     else:
                         debug('Closing tag ({}) does not match opening tag ({}).\n\n'.format(tag, currentInlineStatus))
                         exit(1)
