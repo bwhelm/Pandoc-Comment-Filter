@@ -35,15 +35,12 @@ Copyright (C) 2016 Bennett Helm
 
 ## Inline Items:
 
-`<comment>`:    begin commenting
-`</comment>`:   end commenting
-`<highlight>`:  begin highlighting (note that this requires that `soul.sty`
-                    be loaded in LaTeX)
-`</highlight>`: end highlighting
-`<fixme>`:      begin FixMe margin note (and highlighting)
-`</fixme>`:     end FixMe margin note (and highlighting)
-`<margin>`:     begin margin note
-`</margin>`:    end margin note
+`[...]{.comment}`:    make `...` be a comment
+`[...]{.highlight}`:  make `...` be highlighted (note that this requires that
+                         `soul.sty` be loaded in LaTeX)
+`[...]{.fixme}`:      make `...` be a FixMe margin note (with highlighting)
+`[...]{.margin}`:     make `...` be a margin note
+`[...]{.smcaps}`:       make `...` be in small caps
 
 
 ## Other Items:
@@ -114,7 +111,9 @@ LATEX_TEXT = {
     '<center>': '\\begin{center}',  # TODO Need to figure out what to do for beamer!
     '</center>': '\\end{center}',
     '<!speaker>': '\\textcolor{{{}}}{{'.format(COLORS['<!comment>']),  # Note: treat this just like <!comment>
-    '</!speaker>': '}'
+    '</!speaker>': '}',
+    '<smcaps>': '\\textsc{',
+    '</smcaps>': '}'
 }
 HTML_TEXT = {
     '<!comment>': '<div style="color: {};">'.format(COLORS['<!comment>']),
@@ -132,7 +131,9 @@ HTML_TEXT = {
     '<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
     '</!box>': '</div>',
     '<!speaker>': '<div style="color: {};">'.format(COLORS['<!comment>']),  # Note: treat this just like <!comment>
-    '</!speaker>': '</div>'
+    '</!speaker>': '</div>',
+    '<smcaps>': '<span style="font-variant: small-caps;">',
+    '</smcaps>': '</span>'
 }
 REVEALJS_TEXT = {
     '<!comment>': '<div style="color: {};">'.format(COLORS['<!comment>']),
@@ -150,7 +151,9 @@ REVEALJS_TEXT = {
     '<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
     '</!box>': '</div>',
     '<!speaker>': '<aside class="notes">',
-    '</!speaker>': '</aside>'
+    '</!speaker>': '</aside>',
+    '<smcaps>': '<span style="font-variant: small-caps;">',
+    '</smcaps>': '</span>'
 }
 
 
@@ -329,6 +332,22 @@ def handle_comments(key, value, docFormat, meta):
                     return content
             else:
                 return content
+        elif "smcaps" in classes:
+            # Always show this---don't worry about draft status!
+            if docFormat in ['latex', 'beamer']:
+                newContent = walk(content, handle_comments, docFormat, meta)
+                return [latex(LATEX_TEXT["<smcaps>"])] + newContent + [latex(LATEX_TEXT["</smcaps>"])]
+            elif docFormat in ['html', 'html5']:
+                newContent = walk(content, handle_comments, docFormat, meta)
+                return [html(HTML_TEXT["<smcaps>"])] + newContent + [html(HTML_TEXT["</smcaps>"])]
+            elif docFormat == 'revealjs':
+                newContent = walk(content, handle_comments, docFormat, meta)
+                return [html(REVEALJS_TEXT["<smcaps>"])] + newContent + [html(REVEALJS_TEXT["</smcaps>"])]
+            else:
+                # FIXME: I should run this through a filter that capitalizes all
+                       # strings in `content`.
+                return content
+
     
     # Then check to see if we're changing INLINE_TAG_STACK...
     elif key == 'RawInline':
