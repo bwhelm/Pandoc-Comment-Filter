@@ -68,7 +68,8 @@ Note that the caption can be formatted text in markdown.
 """
 
 
-from pandocfilters import toJSONFilter, walk, RawInline, Para, Plain, Image, Str
+from pandocfilters import toJSONFilter, walk, RawInline, Para, Plain,\
+    Image, Str
 from os import path, mkdir, chdir, getcwd
 from shutil import copyfile, rmtree
 from sys import getfilesystemencoding, stderr
@@ -93,24 +94,30 @@ COLORS = {
 }
 
 # HTML style for margin notes
-MARGIN_STYLE = 'max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;'
+MARGIN_STYLE = 'max-width:20%; border: 1px solid black;' + \
+               'padding: 1ex; margin: 1ex; float:right; font-size: small;'
 
 LATEX_TEXT = {
     '<!comment>': '\\color{{{}}}{{}}'.format(COLORS['<!comment>']),
     '</!comment>': '\\color{black}{}',
-    '<!box>': '\\medskip\\noindent\\fbox{\\begin{minipage}[t]{0.98\\columnwidth}',
+    '<!box>': '\\medskip\\noindent' +
+              '\\fbox{\\begin{minipage}[t]{0.98\\columnwidth}',
     '</!box>': '\\end{minipage}}\\medskip{}',
     '<comment>': '\\textcolor{{{}}}{{'.format(COLORS['<comment>']),
     '</comment>': '}',
     '<highlight>': '\\hl{',
     '</highlight>': '}',
-    '<margin>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}{{'.format(COLORS['<margin>']),
+    '<margin>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}{{'
+                .format(COLORS['<margin>']),
     '</margin>': '}}}',
-    '<fixme>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}{{Fix this!}}}}}}\\textcolor{{{}}}{{'.format(COLORS['<fixme>'], COLORS['<fixme>']),
+    '<fixme>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}' +
+               '{{Fix this!}}}}}}\\textcolor{{{}}}{{'
+               .format(COLORS['<fixme>'], COLORS['<fixme>']),
     '</fixme>': '}',
-    '<center>': '\\begin{center}',  # TODO Need to figure out what to do for beamer!
+    '<center>': '\\begin{center}',  # TODO Add fix for beamer
     '</center>': '\\end{center}',
-    '<!speaker>': '\\textcolor{{{}}}{{'.format(COLORS['<!comment>']),  # Note: treat this just like <!comment>
+    # Note: treat <!speaker> just like <!comment>
+    '<!speaker>': '\\textcolor{{{}}}{{'.format(COLORS['<!comment>']),
     '</!speaker>': '}',
     '<smcaps>': '\\textsc{',
     '</smcaps>': '}'
@@ -122,15 +129,19 @@ HTML_TEXT = {
     '</comment>': '</span>',
     '<highlight>': '<mark>',
     '</highlight>': '</mark>',
-    '<margin>': '<span style="color: {}; {}">'.format(COLORS['<margin>'], MARGIN_STYLE),
+    '<margin>': '<span style="color: {}; {}">'
+                .format(COLORS['<margin>'], MARGIN_STYLE),
     '</margin>': '</span>',
-    '<fixme>': '<span style="color: {}; {}">Fix this!</span><span style="color: {};">'.format(COLORS['<fixme>'], MARGIN_STYLE, COLORS['<fixme>']),
+    '<fixme>': '<span style="color: {}; {}">Fix this!</span>' +
+               '<span style="color: {};">'
+               .format(COLORS['<fixme>'], MARGIN_STYLE, COLORS['<fixme>']),
     '</fixme>': '</span>',
     '<center>': '<div style="text-align:center";>',
     '</center>': '</div>',
     '<!box>': '<div style="border:1px solid black; padding:1.5ex;">',
     '</!box>': '</div>',
-    '<!speaker>': '<div style="color: {};">'.format(COLORS['<!comment>']),  # Note: treat this just like <!comment>
+    # Note: treat <!speaker> just like <!comment>
+    '<!speaker>': '<div style="color: {};">'.format(COLORS['<!comment>']),
     '</!speaker>': '</div>',
     '<smcaps>': '<span style="font-variant: small-caps;">',
     '</smcaps>': '</span>'
@@ -142,9 +153,12 @@ REVEALJS_TEXT = {
     '</comment>': '</span>',
     '<highlight>': '<mark>',
     '</highlight>': '</mark>',
-    '<margin>': '<span style="color: {}; {};">'.format(COLORS['<margin>'], MARGIN_STYLE),
+    '<margin>': '<span style="color: {}; {};">'
+                .format(COLORS['<margin>'], MARGIN_STYLE),
     '</margin>': '</span>',
-    '<fixme>': '<span style="color: {}; {}">Fix this!</span><span style="color: {};">'.format(COLORS['<fixme>'], MARGIN_STYLE, COLORS['<fixme>']),
+    '<fixme>': '<span style="color: {}; {}">Fix this!</span>' +
+               '<span style="color: {};">'
+               .format(COLORS['<fixme>'], MARGIN_STYLE, COLORS['<fixme>']),
     '</fixme>': '</span>',
     '<center>': '<div style="text-align:center";>',
     '</center>': '</div>',
@@ -173,12 +187,13 @@ def tikz2image(tikz, filetype, outfile):
     f = open('tikz.tex', 'w')
     f.write(tikz)
     f.close()
-    p = call(['pdflatex', 'tikz.tex'], stdout=stderr)
+    call(['pdflatex', 'tikz.tex'], stdout=stderr)
     chdir(olddir)
     if filetype == '.pdf':
         copyfile(path.join(tmpdir, 'tikz.pdf'), outfile + filetype)
     else:
-        call(['convert', '-density', '300', path.join(tmpdir, 'tikz.pdf'), '-quality', '100', outfile + filetype])
+        call(['convert', '-density', '300', path.join(tmpdir, 'tikz.pdf'),
+              '-quality', '100', outfile + filetype])
     rmtree(tmpdir)
 
 
@@ -246,7 +261,9 @@ def handle_comments(key, value, docFormat, meta):
                 return
         elif tag in ['</!comment>', '</!box>', '</center>', '</!speaker>']:
             if INLINE_TAG_STACK:
-                debug('Need to close all inline elements before closing block elements!\n\n{}\n\nbefore\n\n{}\n\n'.format(str(INLINE_TAG_STACK), tag))
+                debug('Need to close all inline elements before closing '
+                      + 'block elements!\n\n{}\n\nbefore\n\n{}\n\n'
+                      .format(str(INLINE_TAG_STACK), tag))
                 exit(1)
             if tag == '</!comment>':
                 BLOCK_COMMENT = False
@@ -267,21 +284,27 @@ def handle_comments(key, value, docFormat, meta):
 
     if not draft and BLOCK_COMMENT:
         return []  # Need to suppress output
-    
+
     # Rewriting comment code
     elif key == 'Span':
         [itemID, classes, keyValues], content = value
         if "comment" in classes:
             if draft:
                 if docFormat in ['latex', 'beamer']:
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [latex(LATEX_TEXT["<comment>"])] + newContent + [latex(LATEX_TEXT["</comment>"])]
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [latex(LATEX_TEXT["<comment>"])] + newContent +\
+                           [latex(LATEX_TEXT["</comment>"])]
                 elif docFormat in ['html', 'html5']:
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [html(HTML_TEXT["<comment>"])] + newContent + [html(HTML_TEXT["</comment>"])]
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [html(HTML_TEXT["<comment>"])] + newContent +\
+                           [html(HTML_TEXT["</comment>"])]
                 elif docFormat == 'revealjs':
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [html(REVEALJS_TEXT["<comment>"])] + newContent + [html(REVEALJS_TEXT["</comment>"])]
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [html(REVEALJS_TEXT["<comment>"])] + newContent +\
+                           [html(REVEALJS_TEXT["</comment>"])]
                 else:
                     return content
             else:
@@ -289,14 +312,20 @@ def handle_comments(key, value, docFormat, meta):
         elif "margin" in classes:
             if draft:
                 if docFormat in ['latex', 'beamer']:
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [latex(LATEX_TEXT["<margin>"])] + newContent + [latex(LATEX_TEXT["</margin>"])]
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [latex(LATEX_TEXT["<margin>"])] + newContent +\
+                           [latex(LATEX_TEXT["</margin>"])]
                 elif docFormat in ['html', 'html5']:
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [html(HTML_TEXT["<margin>"])] + newContent + [html(HTML_TEXT["</margin>"])]
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [html(HTML_TEXT["<margin>"])] + newContent +\
+                           [html(HTML_TEXT["</margin>"])]
                 elif docFormat == 'revealjs':
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [html(REVEALJS_TEXT["<margin>"])] + newContent + [html(REVEALJS_TEXT["</margin>"])]
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [html(REVEALJS_TEXT["<margin>"])] + newContent +\
+                           [html(REVEALJS_TEXT["</margin>"])]
                 else:
                     return content
             else:
@@ -304,14 +333,20 @@ def handle_comments(key, value, docFormat, meta):
         elif "fixme" in classes:
             if draft:
                 if docFormat in ['latex', 'beamer']:
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [latex(LATEX_TEXT["<fixme>"])] + newContent + [latex(LATEX_TEXT["</fixme>"])]
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [latex(LATEX_TEXT["<fixme>"])] + newContent +\
+                           [latex(LATEX_TEXT["</fixme>"])]
                 elif docFormat in ['html', 'html5']:
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [html(HTML_TEXT["<fixme>"])] + newContent + [html(HTML_TEXT["</fixme>"])]
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [html(HTML_TEXT["<fixme>"])] + newContent +\
+                           [html(HTML_TEXT["</fixme>"])]
                 elif docFormat == 'revealjs':
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [html(REVEALJS_TEXT["<fixme>"])] + newContent + [html(REVEALJS_TEXT["</fixme>"])]
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [html(REVEALJS_TEXT["<fixme>"])] + newContent +\
+                           [html(REVEALJS_TEXT["</fixme>"])]
                 else:
                     return content
             else:
@@ -319,16 +354,23 @@ def handle_comments(key, value, docFormat, meta):
         elif "highlight" in classes:
             if draft:
                 if docFormat in ['latex', 'beamer']:
-                    # Note: Because of limitations of highlighting in LaTeX, can't
-                    #       nest any comments inside here: will get LaTeX error.
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [latex(LATEX_TEXT["<highlight>"])] + newContent + [latex(LATEX_TEXT["</highlight>"])]
+                    # Note: Because of limitations of highlighting in LaTeX,
+                    # can't nest any comments inside here: will get LaTeX
+                    # error.
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [latex(LATEX_TEXT["<highlight>"])] + newContent +\
+                           [latex(LATEX_TEXT["</highlight>"])]
                 elif docFormat in ['html', 'html5']:
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [html(HTML_TEXT["<highlight>"])] + newContent + [html(HTML_TEXT["</highlight>"])]
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [html(HTML_TEXT["<highlight>"])] + newContent +\
+                           [html(HTML_TEXT["</highlight>"])]
                 elif docFormat == 'revealjs':
-                    newContent = walk(content, handle_comments, docFormat, meta)
-                    return [html(REVEALJS_TEXT["<highlight>"])] + newContent + [html(REVEALJS_TEXT["</highlight>"])]
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [html(REVEALJS_TEXT["<highlight>"])] + newContent +\
+                           [html(REVEALJS_TEXT["</highlight>"])]
                 else:
                     return content
             else:
@@ -337,19 +379,21 @@ def handle_comments(key, value, docFormat, meta):
             # Always show this---don't worry about draft status!
             if docFormat in ['latex', 'beamer']:
                 newContent = walk(content, handle_comments, docFormat, meta)
-                return [latex(LATEX_TEXT["<smcaps>"])] + newContent + [latex(LATEX_TEXT["</smcaps>"])]
+                return [latex(LATEX_TEXT["<smcaps>"])] + newContent +\
+                       [latex(LATEX_TEXT["</smcaps>"])]
             elif docFormat in ['html', 'html5']:
                 newContent = walk(content, handle_comments, docFormat, meta)
-                return [html(HTML_TEXT["<smcaps>"])] + newContent + [html(HTML_TEXT["</smcaps>"])]
+                return [html(HTML_TEXT["<smcaps>"])] + newContent +\
+                       [html(HTML_TEXT["</smcaps>"])]
             elif docFormat == 'revealjs':
                 newContent = walk(content, handle_comments, docFormat, meta)
-                return [html(REVEALJS_TEXT["<smcaps>"])] + newContent + [html(REVEALJS_TEXT["</smcaps>"])]
+                return [html(REVEALJS_TEXT["<smcaps>"])] + newContent +\
+                       [html(REVEALJS_TEXT["</smcaps>"])]
             else:
-                # FIXME: I should run this through a filter that capitalizes all
-                       # strings in `content`.
+                # FIXME: I should run this through a filter that capitalizes
+                # all strings in `content`.
                 return content
 
-    
     # Then check to see if we're changing INLINE_TAG_STACK...
     elif key == 'RawInline':
         elementFormat, tag = value
@@ -426,7 +470,8 @@ def handle_comments(key, value, docFormat, meta):
                                 preText, LATEX_TEXT[tag], previousColor,
                                 postText))
                     else:
-                        debug('Closing tag ({}) does not match opening tag ({}).\n\n'.format(tag, currentInlineStatus))
+                        debug('Closing tag ({}) does not match opening tag '
+                              + '({}).\n\n'.format(tag, currentInlineStatus))
                         exit(1)
             else:  # Some docFormat other than LaTeX/beamer
                 if tag in ['<comment>', '<fixme>', '<margin>',
@@ -506,7 +551,7 @@ def handle_comments(key, value, docFormat, meta):
             else:
                 font = DEFAULT_FONT
             outfile = path.join(IMAGE_PATH, my_sha1(code + font))
-            filetype = '.pdf' if docFormat == 'latex' else '.png'
+            filetype = '.pdf' if docFormat in ['latex', 'beamer'] else '.png'
             sourceFile = outfile + filetype
             caption = ''
             library = ''
@@ -521,7 +566,9 @@ def handle_comments(key, value, docFormat, meta):
                     debug('Created directory {}\n\n'.format(IMAGE_PATH))
                 except OSError:
                     pass
-                codeHeader = '\\documentclass{{standalone}}\n\\usepackage{{{}}}\n\\usepackage{{tikz}}\n'.format(font)
+                codeHeader = '\\documentclass{{standalone}}\n' + \
+                             '\\usepackage{{{}}}\n' + \
+                             '\\usepackage{{tikz}}\n'.format(font)
                 if library:
                     codeHeader += '\\usetikzlibrary{{{}}}\n'.format(library)
                 codeHeader += '\\begin{document}\n'
@@ -539,7 +586,8 @@ def handle_comments(key, value, docFormat, meta):
                     formattedCaption = eval(jsonString)[1][0]['c']
             else:
                 formattedCaption = [Str('')]
-            return Para([Image((id, classes, attributes), formattedCaption, [sourceFile, caption])])
+            return Para([Image((id, classes, attributes), formattedCaption,
+                        [sourceFile, caption])])
         else:  # CodeBlock, but not tikZ
             return
 
