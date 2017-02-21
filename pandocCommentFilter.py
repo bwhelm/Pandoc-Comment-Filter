@@ -461,6 +461,8 @@ def handle_comments(key, value, docFormat, meta):
     else:  # Not text this filter modifies....
         return
 
+def cli():
+    return toJSONFilter(handle_comments)
 
 if __name__ == "__main__":
-    toJSONFilter(handle_comments)
+    cli()

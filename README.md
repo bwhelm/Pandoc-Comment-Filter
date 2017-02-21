@@ -18,6 +18,18 @@ Try setting the `draft` YAML option to either `true` or `false` and
 then exporting this README to .html, .tex, or .pdf to see the effect it
 has on the final output.
 
+# Installation
+
+```
+> pip install "git+https://github.com/bwhelm/Pandoc-Comment-Filter.git"
+```
+This installs the command `pandoc-comments` into the `bin` directory
+of the current python installation.
+
+# Usage
+
+`pandoc --filter pandoc-comments` etc.
+
 # Syntax for markdown:
 
 ## Block Elements:
