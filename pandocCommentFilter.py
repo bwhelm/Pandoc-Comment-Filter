@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 
 """
-Pandoc filter to extend the use of RawInline and RawBlocks to highlight
-or comment on text. In draft mode, both are displayed in red; in
-non-draft mode, only highlights are displayed, and that only in black.
+Pandoc filter to extend pandoc's markdown to incorporate comment features and
+other things I find useful. With `draft: true` in the YAML header, comments and
+margin notes are displayed in red, and text that is highlighted or flagged with
+`fixme` is marked up in the output. With `draft: false` in the YAML header,
+comments and margin notes are not displayed at all, and highlightings and
+`fixme` mark ups are suppressed (though the text is displayed). Also provided
+are markup conventions for cross-references, index entries, and TikZ figures.
 
-Copyright (C) 2016 Bennett Helm
+Copyright (C) 2017 Bennett Helm
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -114,7 +118,7 @@ LATEX_TEXT = {
                '{{Fix this!}}}}}}\\textcolor{{{}}}{{'
                .format(COLORS['<fixme>'], COLORS['<fixme>']),
     '</fixme>': '}',
-    '<center>': '\\begin{center}',  # TODO Add fix for beamer
+    '<center>': '\\begin{center}',
     '</center>': '\\end{center}',
     # Note: treat <!speaker> just like <!comment>
     '<!speaker>': '\\textcolor{{{}}}{{'.format(COLORS['<!comment>']),
@@ -250,9 +254,8 @@ def handle_comments(key, value, docFormat, meta):
                 if not draft:
                     return []
                 INLINE_FONT_COLOR_STACK.append(COLORS[tag])
-            if docFormat == 'latex':
+            if docFormat in ['latex', 'beamer']:
                 return Para([latex(LATEX_TEXT[tag])])
-                # FIXME: What about beamer?
             elif docFormat in ['html', 'html5']:
                 return Plain([html(HTML_TEXT[tag])])
             elif docFormat == 'revealjs':
@@ -270,9 +273,8 @@ def handle_comments(key, value, docFormat, meta):
                 if not draft:
                     return []
                 INLINE_FONT_COLOR_STACK.pop()
-            if docFormat == 'latex':
+            if docFormat in ['latex', 'beamer']:
                 return Para([latex(LATEX_TEXT[tag])])
-                # FIXME: What about beamer?
             elif docFormat in ['html', 'html5']:
                 return Plain([html(HTML_TEXT[tag])])
             elif docFormat == 'revealjs':
@@ -491,28 +493,28 @@ def handle_comments(key, value, docFormat, meta):
                     return []
 
         elif tag.startswith('<i ') and tag.endswith('>'):  # Index
-            if docFormat == 'latex':
+            if docFormat == 'latex':  # (This is senseless in beamer.)
                 return latex('\\index{{{}}}'.format(tag[3:-1]))
             else:
                 return []
 
         elif tag.startswith('<l ') and tag.endswith('>'):
             # My definition of a label
-            if docFormat == 'latex':
+            if docFormat in ['latex', 'beamer']:
                 return latex('\\label{{{}}}'.format(tag[3:-1]))
             elif docFormat in ['html', 'html5']:
                 return html('<a name="{}"></a>'.format(tag[3:-1]))
 
         elif tag.startswith('<r ') and tag.endswith('>'):
             # My definition of a reference
-            if docFormat == 'latex':
+            if docFormat in ['latex', 'beamer']:
                 return latex('\\cref{{{}}}'.format(tag[3:-1]))
             elif docFormat in ['html', 'html5']:
                 return html('<a href="#{}">here</a>'.format(tag[3:-1]))
 
         elif tag.startswith('<rp ') and tag.endswith('>'):
             # My definition of a page reference
-            if docFormat == 'latex':
+            if docFormat in ['latex', 'beamer']:
                 return latex('\\cpageref{{{}}}'.format(tag[4:-1]))
             elif docFormat in ['html', 'html5']:
                 return html('<a href="#{}">here</a>'.format(tag[4:-1]))
@@ -528,7 +530,7 @@ def handle_comments(key, value, docFormat, meta):
             # will cause '\noindent{}' to be output first.
             if value[0]['t'] == 'Str' and value[0]['c'] == '<' \
                     and value[1]['t'] == 'Space':
-                if docFormat == 'latex':
+                if docFormat in ['latex', 'beamer']:
                     return Para([latex('\\noindent{}')] + value[2:])
                 elif docFormat in ['html', 'html5']:
                     return Para([html('<div class="noindent">')] +
