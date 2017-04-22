@@ -114,9 +114,10 @@ LATEX_TEXT = {
     '<margin>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}{{'
                 .format(COLORS['<margin>']),
     '</margin>': '}}}',
-    '<fixme>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}' +
+    '<fixme>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}'
+               .format(COLORS['<fixme>']) +
                '{{Fix this!}}}}}}\\textcolor{{{}}}{{'
-               .format(COLORS['<fixme>'], COLORS['<fixme>']),
+               .format(COLORS['<fixme>']),
     '</fixme>': '}',
     '<center>': '\\begin{center}',
     '</center>': '\\end{center}',
@@ -136,8 +137,7 @@ HTML_TEXT = {
     '<margin>': '<span style="color: {}; {}">'
                 .format(COLORS['<margin>'], MARGIN_STYLE),
     '</margin>': '</span>',
-    '<fixme>': '<span style="color: {}; {}">Fix this!</span>' +
-               '<span style="color: {};">'
+    '<fixme>': '<span style="color: {}; {}">Fix this!</span><span style="color: {};">'
                .format(COLORS['<fixme>'], MARGIN_STYLE, COLORS['<fixme>']),
     '</fixme>': '</span>',
     '<center>': '<div style="text-align:center";>',
