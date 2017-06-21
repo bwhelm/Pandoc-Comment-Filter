@@ -492,6 +492,20 @@ def handle_comments(key, value, docFormat, meta):
                 else:
                     return []
 
+        elif tag in ['<smcaps>', '</smcaps>']:
+            if tag == '<smcaps>':
+                INLINE_TAG_STACK.append(tag)
+            else:
+                INLINE_TAG_STACK.pop()
+            if docFormat in ['latex', 'beamer']:
+                return latex(LATEX_TEXT[tag])
+            elif docFormat in ['html', 'html5']:
+                return html(HTML_TEXT[tag])
+            elif docFormat == 'revealjs':
+                return html(REVEALJS_TEXT[tag])
+            else:
+                return []
+
         elif tag.startswith('<i ') and tag.endswith('>'):  # Index
             if docFormat == 'latex':  # (This is senseless in beamer.)
                 return latex('\\index{{{}}}'.format(tag[3:-1]))
