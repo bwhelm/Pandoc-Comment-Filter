@@ -137,8 +137,10 @@ HTML_TEXT = {
     '<margin>': '<span style="color: {}; {}">'
                 .format(COLORS['<margin>'], MARGIN_STYLE),
     '</margin>': '</span>',
-    '<fixme>': '<span style="color: {}; {}">Fix this!</span><span style="color: {};">'
-               .format(COLORS['<fixme>'], MARGIN_STYLE, COLORS['<fixme>']),
+    '<fixme>': '<span style="color: {}; {}">Fix this!</span>'
+               + '<span style="color: {};">'.format(COLORS['<fixme>'],
+                                                    MARGIN_STYLE,
+                                                    COLORS['<fixme>']),
     '</fixme>': '</span>',
     '<center>': '<div style="text-align:center";>',
     '</center>': '</div>',
@@ -287,7 +289,6 @@ def handle_comments(key, value, docFormat, meta):
     if not draft and BLOCK_COMMENT:
         return []  # Need to suppress output
 
-    # Rewriting comment code
     elif key == 'Span':
         [itemID, classes, keyValues], content = value
         if "comment" in classes:
