@@ -37,20 +37,36 @@ Copyright (C) 2017 Bennett Helm
 `</!speaker>`: end speaker notes
 
 
-## Inline Items:
+## Inline Items: Two Styles
 
-`[...]{.comment}`:    make `...` be a comment
-`[...]{.highlight}`:  make `...` be highlighted (note that this requires that
-                         `soul.sty` be loaded in LaTeX)
-`[...]{.fixme}`:      make `...` be a FixMe margin note (with highlighting)
-`[...]{.margin}`:     make `...` be a margin note
-`[...]{.smcaps}`:       make `...` be in small caps
+1. Tag-style:
+    - `<comment>`:    begin commenting
+    - `</comment>`:   end commenting
+    - `<highlight>`:  begin highlighting (note that this requires that
+                      `soul.sty` be loaded in LaTeX)
+    - `</highlight>`: end highlighting
+    - `<fixme>`:      begin FixMe margin note (and highlighting)
+    - `</fixme>`:     end FixMe margin note (and highlighting)
+    - `<margin>`:     begin margin note
+    - `</margin>`:    end margin note
+    - `<smcaps>`:     begin small caps style
+    - `</smcaps>`:    end small caps style
+
+2. Span-style:
+
+    - `[...]{.comment}`:    make `...` be a comment
+    - `[...]{.highlight}`:  make `...` be highlighted (note that this requires
+                            that `soul.sty` be loaded in LaTeX)
+    - `[...]{.fixme}`:      make `...` be a FixMe margin note (with
+                            highlighting)
+    - `[...]{.margin}`:     make `...` be a margin note
+    - `[...]{.smcaps}`:     make `...` be in small caps
 
 
 ## Other Items:
 
-`< `:                 do not indent paragraph (after quotation block or
-                          lists, e.g.)
+`< `:                 (at begining of line) do not indent paragraph (after
+                      quotation block or lists, e.g.)
 `<l LABEL>`:          create a label
 `<r LABEL>`:          create a reference
 `<rp LABEL>`:         create a page reference
