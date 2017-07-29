@@ -154,9 +154,8 @@ HTML_TEXT = {
                 .format(COLORS['<margin>'], MARGIN_STYLE),
     '</margin>': '</span>',
     '<fixme>': '<span style="color: {}; {}">Fix this!</span>'
-               + '<span style="color: {};">'.format(COLORS['<fixme>'],
-                                                    MARGIN_STYLE,
-                                                    COLORS['<fixme>']),
+                .format(COLORS['<fixme>'], MARGIN_STYLE)
+               + '<span style="color: {};">'.format(COLORS['<fixme>']),
     '</fixme>': '</span>',
     '<center>': '<div style="text-align:center";>',
     '</center>': '</div>',
@@ -178,9 +177,9 @@ REVEALJS_TEXT = {
     '<margin>': '<span style="color: {}; {};">'
                 .format(COLORS['<margin>'], MARGIN_STYLE),
     '</margin>': '</span>',
-    '<fixme>': '<span style="color: {}; {}">Fix this!</span>' +
-               '<span style="color: {};">'
-               .format(COLORS['<fixme>'], MARGIN_STYLE, COLORS['<fixme>']),
+    '<fixme>': '<span style="color: {}; {}">Fix this!</span>'
+                .format(COLORS['<fixme>'], MARGIN_STYLE)
+               + '<span style="color: {};">'.format(COLORS['<fixme>']),
     '</fixme>': '</span>',
     '<center>': '<div style="text-align:center";>',
     '</center>': '</div>',
