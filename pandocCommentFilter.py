@@ -88,8 +88,8 @@ Note that the caption can be formatted text in markdown.
 """
 
 
-from pandocfilters import toJSONFilter, walk, RawInline, Para, Plain,\
-    Image, Str
+from pandocfilters import json, sys, walk, elt,\
+    RawInline, Para, Plain, Image, Str
 from os import path, mkdir, chdir, getcwd
 from shutil import copyfile, rmtree
 from sys import getfilesystemencoding, stderr
@@ -104,6 +104,8 @@ INLINE_COMMENT = False
 INLINE_MARGIN = False
 INLINE_HIGHLIGHT = False
 INLINE_FONT_COLOR_STACK = ['black']
+USED_BOX = False
+DRAFT = False
 
 COLORS = {
     '<!comment>': 'red',
@@ -120,9 +122,8 @@ MARGIN_STYLE = 'max-width:20%; border: 1px solid black;' + \
 LATEX_TEXT = {
     '<!comment>': '\\color{{{}}}{{}}'.format(COLORS['<!comment>']),
     '</!comment>': '\\color{black}{}',
-    '<!box>': '\\medskip\\noindent' +
-              '\\fbox{\\begin{minipage}[t]{0.98\\columnwidth}',
-    '</!box>': '\\end{minipage}}\\medskip{}',
+    '<!box>': '\\medskip\\begin{mdframed}',
+    '</!box>': '\\end{mdframed}\\medskip{}',
     '<comment>': '\\textcolor{{{}}}{{'.format(COLORS['<comment>']),
     '</comment>': '}',
     '<highlight>': '\\hl{',
@@ -237,18 +238,11 @@ def html(text):
 
 def handle_comments(key, value, docFormat, meta):
     global INLINE_TAG_STACK, BLOCK_COMMENT, INLINE_COMMENT, INLINE_MARGIN,\
-        INLINE_HIGHLIGHT, INLINE_FONT_COLOR_STACK
+        INLINE_HIGHLIGHT, INLINE_FONT_COLOR_STACK, USED_BOX, DRAFT
 
     # If translating to markdown, leave everything alone.
     if docFormat == 'markdown':
         return
-
-    # Get draft status from metadata field (or assume not draft if there's
-    # no such field)
-    try:
-        draft = meta['draft']['c']
-    except KeyError:
-        draft = False
 
     # Check to see if we're starting or closing a Block element
     if key == 'RawBlock':
@@ -257,7 +251,7 @@ def handle_comments(key, value, docFormat, meta):
             return
         tag = tag.lower()
 
-        if not draft:
+        if not DRAFT:
             if BLOCK_COMMENT:  # Need to suppress output
                 if tag == '</!comment>':
                     BLOCK_COMMENT = False
@@ -268,9 +262,11 @@ def handle_comments(key, value, docFormat, meta):
         if tag in ['<!comment>', '<!box>', '<center>', '<!speaker>']:
             if tag == '<!comment>':
                 BLOCK_COMMENT = True
-                if not draft:
+                if not DRAFT:
                     return []
                 INLINE_FONT_COLOR_STACK.append(COLORS[tag])
+            elif tag == '<!box>':
+                USED_BOX = True
             if docFormat in ['latex', 'beamer']:
                 return Para([latex(LATEX_TEXT[tag])])
             elif docFormat in ['html', 'html5']:
@@ -287,7 +283,7 @@ def handle_comments(key, value, docFormat, meta):
                 exit(1)
             if tag == '</!comment>':
                 BLOCK_COMMENT = False
-                if not draft:
+                if not DRAFT:
                     return []
                 INLINE_FONT_COLOR_STACK.pop()
             if docFormat in ['latex', 'beamer']:
@@ -301,13 +297,13 @@ def handle_comments(key, value, docFormat, meta):
         else:
             return  # TODO Is this the right thing to do?
 
-    if not draft and BLOCK_COMMENT:
+    if not DRAFT and BLOCK_COMMENT:
         return []  # Need to suppress output
 
     elif key == 'Span':
         [itemID, classes, keyValues], content = value
         if "comment" in classes:
-            if draft:
+            if DRAFT:
                 if docFormat in ['latex', 'beamer']:
                     newContent = walk(content, handle_comments, docFormat,
                                       meta)
@@ -328,7 +324,7 @@ def handle_comments(key, value, docFormat, meta):
             else:
                 return []
         elif "margin" in classes:
-            if draft:
+            if DRAFT:
                 if docFormat in ['latex', 'beamer']:
                     newContent = walk(content, handle_comments, docFormat,
                                       meta)
@@ -349,7 +345,7 @@ def handle_comments(key, value, docFormat, meta):
             else:
                 return []
         elif "fixme" in classes:
-            if draft:
+            if DRAFT:
                 if docFormat in ['latex', 'beamer']:
                     newContent = walk(content, handle_comments, docFormat,
                                       meta)
@@ -370,7 +366,7 @@ def handle_comments(key, value, docFormat, meta):
             else:
                 return content
         elif "highlight" in classes:
-            if draft:
+            if DRAFT:
                 if docFormat in ['latex', 'beamer']:
                     # Note: Because of limitations of highlighting in LaTeX,
                     # can't nest any comments inside here: will get LaTeX
@@ -421,7 +417,7 @@ def handle_comments(key, value, docFormat, meta):
         # Check to see if need to suppress output. We do this only for
         # `<comment>` and `<margin>` tags; with `<fixme>` and `<highlight>`
         # tags, we merely suppress the tag.
-        if not draft:
+        if not DRAFT:
             if tag == '<comment>':
                 INLINE_COMMENT = True
                 return []
@@ -549,7 +545,7 @@ def handle_comments(key, value, docFormat, meta):
             elif docFormat in ['html', 'html5']:
                 return html('<a href="#{}">here</a>'.format(tag[4:-1]))
 
-    elif not draft and (INLINE_COMMENT or INLINE_MARGIN):
+    elif not DRAFT and (INLINE_COMMENT or INLINE_MARGIN):
         # Suppress all output
         return []
 
@@ -627,5 +623,50 @@ def handle_comments(key, value, docFormat, meta):
         return
 
 
-if __name__ == "__main__":
-    toJSONFilter(handle_comments)
+def main():
+    # This grabs the output of `pandoc` as json file, retrieves `metadata` to
+    # check for draft status, and runs the document through `handle_comments`.
+    # Then adds any needed entries to `metadata` and passes the output back out
+    # to `pandoc`. This code is modeled after
+    # <https://github.com/aaren/pandoc-reference-filter>.
+    global DRAFT
+    document = json.loads(sys.stdin.read())
+    if len(sys.argv) > 1:
+        format = sys.argv[1]
+    else:
+        format = ''
+
+    if 'meta' in document:           # new API
+        metadata = document['meta']
+    elif document[0]:                # old API
+        metadata = document[0]['unMeta']
+
+    if 'draft' in metadata:
+        DRAFT = metadata['draft']['c']
+    else:
+        DRAFT = False
+
+    newDocument = document
+    newDocument = walk(newDocument, handle_comments, format, metadata)
+
+    # Need to ensure the LaTeX/beamer template knows if `mdframed` package is
+    # required (when `<!box>` has been used).
+    if (format == 'latex' or format == 'beamer') and USED_BOX:
+        MetaList = elt('MetaList', 1)
+        MetaInlines = elt('MetaInlines', 1)
+        rawinlines = [MetaInlines([RawInline('tex',
+                                             '\\RequirePackage{mdframed}')])]
+        if 'header-includes' in metadata:
+            headerIncludes = metadata['header-includes']
+            if headerIncludes['t'] == 'MetaList':
+                rawinlines += headerIncludes['c']
+            else:  # headerIncludes['t'] == 'MetaInlines'
+                rawinlines += [headerIncludes]
+        metadata['header-includes'] = MetaList(rawinlines)
+        newDocument['meta'] = metadata
+
+    json.dump(newDocument, sys.stdout)
+
+
+if __name__ == '__main__':
+    main()
