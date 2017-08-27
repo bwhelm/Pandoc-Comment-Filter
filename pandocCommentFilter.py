@@ -191,6 +191,26 @@ REVEALJS_TEXT = {
     '<smcaps>': '<span style="font-variant: small-caps;">',
     '</smcaps>': '</span>'
 }
+DOCX_TEXT = {
+    '<!comment>': '',
+    '</!comment>': '',
+    '<comment>': '<w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>',
+    '</comment>': '</w:t>',
+    '<highlight>': '<w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t>',
+    '</highlight>': '</w:t>',
+    '<margin>': '',
+    '</margin>': '',
+    '<fixme>': '<w:rPr><w:color w:val="0000FF"/></w:rPr><w:t>',
+    '</fixme>': '</w:t>',
+    '<center>': '',
+    '</center>': '',
+    '<!box>': '',
+    '</!box>': '',
+    '<!speaker>': '',
+    '</!speaker>': '',
+    '<smcaps>': '',
+    '</smcaps>': ''
+}
 
 
 def debug(text):
@@ -234,6 +254,10 @@ def latex(text):
 
 def html(text):
     return RawInline('html', text)
+
+
+def docx(text):
+    return RawInline('openxml', text)
 
 
 def handle_comments(key, value, docFormat, meta):
@@ -319,6 +343,11 @@ def handle_comments(key, value, docFormat, meta):
                                       meta)
                     return [html(REVEALJS_TEXT["<comment>"])] + newContent +\
                            [html(REVEALJS_TEXT["</comment>"])]
+                elif docFormat == 'docx':
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [docx(DOCX_TEXT["<comment>"])] + newContent +\
+                           [docx(DOCX_TEXT["</comment>"])]
                 else:
                     return content
             else:
@@ -341,7 +370,8 @@ def handle_comments(key, value, docFormat, meta):
                     return [html(REVEALJS_TEXT["<margin>"])] + newContent +\
                            [html(REVEALJS_TEXT["</margin>"])]
                 else:
-                    return content
+                    # return content
+                    return []
             else:
                 return []
         elif "fixme" in classes:
@@ -361,6 +391,11 @@ def handle_comments(key, value, docFormat, meta):
                                       meta)
                     return [html(REVEALJS_TEXT["<fixme>"])] + newContent +\
                            [html(REVEALJS_TEXT["</fixme>"])]
+                elif docFormat == 'docx':
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [docx(DOCX_TEXT["<fixme>"])] + newContent +\
+                           [docx(DOCX_TEXT["</fixme>"])]
                 else:
                     return content
             else:
@@ -385,6 +420,11 @@ def handle_comments(key, value, docFormat, meta):
                                       meta)
                     return [html(REVEALJS_TEXT["<highlight>"])] + newContent +\
                            [html(REVEALJS_TEXT["</highlight>"])]
+                elif docFormat == 'docx':
+                    newContent = walk(content, handle_comments, docFormat,
+                                      meta)
+                    return [docx(DOCX_TEXT["<highlight>"])] + newContent +\
+                           [docx(DOCX_TEXT["</highlight>"])]
                 else:
                     return content
             else:
@@ -403,6 +443,8 @@ def handle_comments(key, value, docFormat, meta):
                 newContent = walk(content, handle_comments, docFormat, meta)
                 return [html(REVEALJS_TEXT["<smcaps>"])] + newContent +\
                        [html(REVEALJS_TEXT["</smcaps>"])]
+            elif docFormat == 'docx':
+                return docx(DOCX_TEXT[tag])
             else:
                 # FIXME: I should run this through a filter that capitalizes
                 # all strings in `content`.
@@ -441,14 +483,18 @@ def handle_comments(key, value, docFormat, meta):
         if tag in ['<comment>', '<fixme>', '<margin>', '<highlight>',
                    '</comment>', '</fixme>', '</margin>', '</highlight>']:
             # LaTeX gets treated differently than HTML
-            if docFormat in ['latex', 'beamer']:
+            if docFormat in ['latex', 'beamer', 'docx']:
                 preText = ''
                 postText = ''
                 # Cannot change COLORS within highlighting in LaTeX (but
                 # don't do anything when closing the highlight tag!)
                 if INLINE_HIGHLIGHT and tag != '</highlight>':
-                    preText = LATEX_TEXT['</highlight>']
-                    postText = LATEX_TEXT['<highlight>']
+                    if docFormat in ['latex', 'beamer']:
+                        preText = LATEX_TEXT['</highlight>']
+                        postText = LATEX_TEXT['<highlight>']
+                    elif docFormat == 'docx':
+                        preText = DOCX_TEXT['</highlight>']
+                        postText = DOCX_TEXT['<highlight>']
                 if tag in ['<comment>', '<fixme>', '<margin>',
                            '<highlight>']:  # If any opening tag
                     if tag == '<comment>':
@@ -464,7 +510,10 @@ def handle_comments(key, value, docFormat, meta):
                         INLINE_FONT_COLOR_STACK.append(
                             INLINE_FONT_COLOR_STACK[-1])
                     INLINE_TAG_STACK.append(tag)
-                    return latex(preText + LATEX_TEXT[tag] + postText)
+                    if docFormat in ['latex', 'beamer']:
+                        return latex(preText + LATEX_TEXT[tag] + postText)
+                    elif docFormat == 'docx':
+                        return docx(preText + DOCX_TEXT[tag] + postText)
                 elif tag in ['</comment>', '</fixme>', '</margin>',
                              '</highlight>']:
                     if tag == '</comment>':
@@ -480,9 +529,12 @@ def handle_comments(key, value, docFormat, meta):
                     currentInlineStatus = INLINE_TAG_STACK.pop()
                     if currentInlineStatus[1:] == tag[2:]:
                         # matching opening tag
-                        return latex('{}{}\\color{{{}}}{{}}{}'.format(
-                                preText, LATEX_TEXT[tag], previousColor,
-                                postText))
+                        if docFormat in ['latex', 'beamer']:
+                            return latex('{}{}\\color{{{}}}{{}}{}'.format(
+                                    preText, LATEX_TEXT[tag], previousColor,
+                                    postText))
+                        elif docFormat == 'docx':
+                            return docx(preText + DOCX_TEXT[tag] + postText)
                     else:
                         debug('Closing tag ({}) does not match opening tag '
                               + '({}).\n\n'.format(tag, currentInlineStatus))
@@ -515,6 +567,8 @@ def handle_comments(key, value, docFormat, meta):
                 return html(HTML_TEXT[tag])
             elif docFormat == 'revealjs':
                 return html(REVEALJS_TEXT[tag])
+            elif docFormat == 'docx':
+                return docx(DOCX_TEXT[tag])
             else:
                 return []
 
