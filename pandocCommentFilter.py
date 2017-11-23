@@ -269,11 +269,15 @@ def handle_comments(key, value, docFormat, meta):
         return
 
     # Check to see if we're starting or closing a Block element
-    if key == 'RawBlock':
-        elementFormat, tag = value
-        if elementFormat != 'html':
-            return
-        tag = tag.lower()
+    if key == 'RawBlock' or (key == 'Para' and len(value) == 1 and
+                             value[0]['t'] == 'Str'):
+        if key == 'RawBlock':
+            elementFormat, tag = value
+            if elementFormat != 'html':
+                return
+            tag = tag.lower()
+        else:
+            tag = value[0]['c']
 
         if not DRAFT:
             if BLOCK_COMMENT:  # Need to suppress output
@@ -318,8 +322,8 @@ def handle_comments(key, value, docFormat, meta):
                 return Plain([html(REVEALJS_TEXT[tag])])
             else:
                 return
-        else:
-            return  # TODO Is this the right thing to do?
+        # else:
+        #     return  # TODO Is this the right thing to do?
 
     if not DRAFT and BLOCK_COMMENT:
         return []  # Need to suppress output
