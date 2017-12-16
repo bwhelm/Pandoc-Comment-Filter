@@ -65,12 +65,21 @@ Copyright (C) 2017 Bennett Helm
 
 ## Other Items:
 
-`< `:                 (at begining of line) do not indent paragraph (after
-                      quotation block or lists, e.g.)
-`<l LABEL>`:          create a label
-`<r LABEL>`:          create a reference
-`<rp LABEL>`:         create a page reference
-`<i text-for-index>`: create a LaTeX index mark (`\\index{text-for-index}`)
+1. Tag-style (pre pandoc2):
+    - `< `:                 (at begining of line) do not indent paragraph
+                            (after quotation block or lists, e.g.)
+    - `<l LABEL>`:          create a label
+    - `<r LABEL>`:          create a reference
+    - `<rp LABEL>`:         create a page reference
+    - `<i text-for-index>`: create LaTeX index mark (`\\index{text-for-index}`)
+
+2. Span-style (pandoc2 and later):
+    - `< `:                   (at begining of line) do not indent paragraph
+                              (after quotation block or lists, e.g.)
+    - `[LABEL]{.l}`:          create a label
+    - `[LABEL]{.r}`:          create a reference
+    - `[LABEL]{.rp}`:         create a page reference
+    - `[text-for-index]{.i}`: create LaTeX index (`\\index{text-for-index}`)
 
 
 ## Images: Allow for tikZ figures in code blocks. They should have the
@@ -88,7 +97,7 @@ Note that the caption can be formatted text in markdown.
 """
 
 
-from pandocfilters import json, sys, walk, elt,\
+from pandocfilters import json, sys, walk, elt, stringify,\
     RawInline, Para, Plain, Image, Str
 from os import path, mkdir, chdir, getcwd
 from shutil import copyfile, rmtree
@@ -453,6 +462,45 @@ def handle_comments(key, value, docFormat, meta):
                 # FIXME: I should run this through a filter that capitalizes
                 # all strings in `content`.
                 return content
+
+        # Alternate way of marking index entries that's required by pandoc2.
+        elif "i" in classes:  # Index
+            if docFormat == 'latex':  # (This is senseless in beamer.)
+                return latex(u'\\index{{{}}}'.format(stringify(content)))
+            else:
+                return []
+
+        elif "l" in classes:  # Label
+            if docFormat in ['latex', 'beamer']:
+                return latex(u'\\label{{{}}}'.format(stringify(content)))
+                # return latex('\\label{{{}}}'.format(tag[3:-1]))
+            elif docFormat in ['html', 'html5']:
+                return html(u'<a name="{}"></a>'.format(stringify(content)))
+                # return html('<a name="{}"></a>'.format(tag[3:-1]))
+            else:
+                return []
+
+        elif "r" in classes:  # Reference
+            if docFormat in ['latex', 'beamer']:
+                return latex(u'\\cref{{{}}}'.format(stringify(content)))
+                # return latex('\\cref{{{}}}'.format(tag[3:-1]))
+            elif docFormat in ['html', 'html5']:
+                return html(u'<a href="#{}">here</a>'
+                            .format(stringify(content)))
+                # return html('<a href="#{}">here</a>'.format(tag[3:-1]))
+            else:
+                return []
+
+        elif "rp" in classes:  # Page reference
+            if docFormat in ['latex', 'beamer']:
+                return latex(u'\\cpageref{{{}}}'.format(stringify(content)))
+                # return latex('\\cpageref{{{}}}'.format(tag[4:-1]))
+            elif docFormat in ['html', 'html5']:
+                return html(u'<a href="#{}">here</a>'
+                            .format(stringify(content)))
+                # return html('<a href="#{}">here</a>'.format(tag[4:-1]))
+            else:
+                return []
 
     # Then check to see if we're changing INLINE_TAG_STACK...
     elif key == 'RawInline':
