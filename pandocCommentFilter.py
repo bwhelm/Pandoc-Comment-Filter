@@ -137,10 +137,11 @@ LATEX_TEXT = {
     '</comment>': '}',
     '<highlight>': '\\hl{',
     '</highlight>': '}',
-    '<margin>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}{{'
-                .format(COLORS['<margin>']),
-    '</margin>': '}}}',
-    '<fixme>': '\\marginpar{{\\footnotesize{{\\textcolor{{{}}}'
+    '<margin>':
+    '\\marginpar{{\\begin{{flushleft}}\\scriptsize{{\\textcolor{{{}}}{{'
+                 .format(COLORS['<margin>']),
+    '</margin>': '}}\\end{flushleft}}',
+    '<fixme>': '\\marginpar{{\\scriptsize{{\\textcolor{{{}}}'
                .format(COLORS['<fixme>']) +
                '{{Fix this!}}}}}}\\textcolor{{{}}}{{'
                .format(COLORS['<fixme>']),
