@@ -61,7 +61,7 @@ Here are the defined inlines:
 
 Note that tag-style inlines no longer work and should be switched to
 span-style. Please change `<tag> ... </tag>` to `[...]{.tag}` in all documents.
-In vim, the following regex works (FIXME: UNTESTED!):
+In vim, the following regex works:
 
     %s/<\(l\|r\|rp\|i\)\s\+\([^>]\+\)>/[\2]{.\1}/gc
 
@@ -77,21 +77,45 @@ Here are the defined inlines:
 
 ## Images:
 
-Allow for tikZ figures in code blocks. They should have the following format:
+Allow for TikZ figures in code blocks. They should have the following format:
 
-    ~~~ {#tikz caption='My *great* caption' id='fig:id' title='The title'
-         tikzlibrary='items,to,go,in,\\usetikzlibrary{}'}
+    ~~~ {#identifier .tikz caption='A caption that allows *markdown* markup.' title='The title' tikzlibrary='items,to,go,in,\\usetikzlibrary{}'}
 
     [LaTeX code]
 
     ~~~
 
-Note that the caption can be formatted text in markdown, but cannot use any
+Note that the caption can be formatted text in markdown, and can use any inline
 elements from this comment filter.
 
-FIXME: Can I manually walk every item through this filter to fix this?
 
---]]
+## Processing .tex Images
+
+This filter will take an image of the form
+`![caption](image_file.tex){attributes}` and create appropriate formatted image
+from that file, converting it to the appropriate file format for the desired
+output.
+
+
+## Macros:
+
+Here I abuse math environments to create easy macros.
+
+1. In YAML header, specify macros as follows:
+
+    macros:
+    - first: this is the substituted text
+      second: this is more substituted text
+
+2. Then in text, have users specify macros to be substituted as follows:
+
+    This is my text and $first$. This is more text and $second$.
+
+As long as the macro labels are not identical to any actual math the user would
+use, there should be no problem.
+
+----------------------------------------------------------------------------]]
+
 
 inspect = require('inspect')
 
@@ -104,10 +128,18 @@ COLORS.margin    = 'red'
 COLORS.fixme     = 'cyan'
 
 -- Location to save completed images
+-- FIXME: Should I get rid of this? It's better not to rely on hard-coded
+-- paths, but the benefit is that I can store images there and not have to
+-- regenerate or reconvert them.
 local HOME_PATH = os.getenv('HOME')
 local IMAGE_PATH = HOME_PATH .. "/tmp/pandoc/Figures/"
 -- Default font for `tikz` figures
 local DEFAULT_FONT = 'fbb'
+
+
+function isCommentBlock(text)
+    return text == 'comment' or text == 'box' or text == 'center' or text == 'speaker'
+end
 
 
 function html(text)
@@ -270,6 +302,9 @@ DOCX_TEXT.rp.Open = ''
 DOCX_TEXT.rp.Close = ''
 
 
+-- html code for producing a margin comment
+local MARGIN_STYLE = "max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;"
+
 -- Used to store YAML variables (to check for `draft` status and for potential
 -- modification later).
 local YAML_VARS = {}
@@ -277,9 +312,6 @@ local YAML_VARS = {}
 -- Indicates whether any box element has been used. If so, need to load LaTeX
 -- package.
 local BOX_USED = false
-
--- html code for producing a margin comment
-local MARGIN_STYLE = "max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;"
 
 -- Used to count words in text, abstract, and footnotes
 local WORD_COUNT = 0
@@ -334,23 +366,48 @@ function getYAML(meta)
             end
         end
     end
-    -- print("ABSTRACT: " .. ABSTRACT_COUNT)
 end
 
 
-function OLDgetYAML(meta)
-    for key, value in pairs(meta) do
-        if type(value) == "boolean" then
-            YAML_VARS[key] = value
-        elseif type(value) == "table" then
-            YAML_VARS[key] = value
+function getPathToBibFile(file)
+    local handle = io.popen('kpsewhich ' .. file)
+    local bibEntry = handle:read("l")
+    handle:close()
+    return bibEntry
+end
+
+
+function fixYAMLHeader(meta)
+    if FORMAT ~= 'latex' then  -- Need to cope with csl style....
+        if meta.csl then
+            meta.csl[1].c = string.gsub(meta.csl[1].c, "~", os.getenv('HOME'))
+        elseif not meta.csl then
+            local intextCSL = os.getenv('HOME') .. '/.pandoc/chicago-manual-of-style-16th-edition-full-in-text.csl'
+            local notesCSL = os.getenv('HOME') .. '/.pandoc/chicago-fullnote-bibliography.csl'
+            if meta.bibinline then
+                meta.csl = pandoc.MetaInlines(pandoc.Str(intextCSL))
+            else
+                meta.csl = pandoc.MetaInlines(pandoc.Str(notesCSL))
+            end
         end
     end
-    if YAML_VARS["abstract"] then
-        content = pandoc.utils.stringify(YAML_VARS["abstract"])
-        _, words = content:gsub("%S+", "")
-        ABSTRACT_COUNT = ABSTRACT_COUNT + words
+    if meta.geometry and meta.geometry[1].c == 'ipad' then
+        if meta.book then
+            meta.geometry[1].c = 'paperwidth=176mm,paperheight=234mm,outer=22mm,top=2.5pc,bottom=3pc,headsep=1pc,includehead,includefoot,centering,inner=22mm,marginparwidth=17mm'
+        else
+            meta.geometry[1].c = 'paperwidth=176mm,paperheight=234mm,width=360.0pt,height=541.40024pt,headsep=1pc,centering'
+        end
     end
+    if meta.bibliography then
+        if meta.bibliography.t == "MetaList" then
+            for key, value in pairs(meta.bibliography) do
+                meta.bibliography[key][1].c = getPathToBibFile(value[1].c)
+            end
+        elseif meta.bibliography.t == "MetaInlines" then
+            meta.bibliography[1].c = getPathToBibFile(meta.bibliography[1].c)
+        end
+    end
+    return meta
 end
 
 
@@ -367,15 +424,138 @@ function setYAML(meta)
         end
     end
     print(string.format("Words:%6d │ Abstract:%4d │ Notes:%5d │ Body:%6d", WORD_COUNT, ABSTRACT_COUNT, NOTE_COUNT, WORD_COUNT - NOTE_COUNT - ABSTRACT_COUNT))
-    -- print("┌───────────────WORD COUNT──────────────┐")
-    -- print(string.format("│ Body text:  %6d │ Notes:    %6d │", WORD_COUNT - NOTE_COUNT - ABSTRACT_COUNT, NOTE_COUNT))
-    -- print(string.format("│ Total:      %6d │ Abstract: %6d │", WORD_COUNT,  ABSTRACT_COUNT))
-    -- print("└────────────────────┴──────────────────┘")
     return meta
 end
 
-function isCommentBlock(text)
-    return text == 'comment' or text == 'box' or text == 'center' or text == 'speaker'
+
+local function file_exists(name)
+    local file = io.open(name, 'r')
+    if file == nil then
+        return false
+    else
+        file:close()
+        return true
+    end
+end
+
+
+function convertImage(imageToConvert, convertedImage)
+    print("Converting to " .. convertedImage .. "...")
+    os.execute("convert -density 300 " .. imageToConvert .. " -quality 100 " .. convertedImage)
+end
+
+
+function handleImages(image)
+    -- This will check if an image is online, and will download it; if it is a
+    -- .tex file, it will typeset it. Having done this, it will convert to the
+    -- proper filetype for desired output.
+    -- pandoc.Image = {{"identifier", "classes", "attributes"}, "caption", {"src", "title"}}
+    local filetype = ".png"
+    if isLaTeX(FORMAT) then
+        filetype = ".pdf"
+    end
+    local imageFile = image.src
+    local imageBaseName, imageExtension
+    _, _, imageBaseName, imageExtension = string.find(imageFile, "([^/]*)(%.%a-)$")
+    if string.find(imageFile, "^https?://") then
+        -- It's an online image; need to download to IMAGE_PATH
+        -- TODO: Use pandoc.mediabag?
+        imageBaseName = IMAGE_PATH .. imageBaseName
+        if file_exists(imageBaseName .. imageExtension) then
+            print(imageFile .. " already exists.")
+        else
+            print("Downloading " .. imageFile .. " to " .. imageBaseName .. imageExtension .. ".")
+            os.execute("wget --quiet " .. imageFile .. " --output-document=" .. imageBaseName .. imageExtension)
+            -- Because sometimes the downloaded file is old, this prevents it
+            -- from being automatically deleted.
+            os.execute("touch " .. imageBaseName .. imageExtension)
+        end
+        -- Convert image if necessary....
+        if imageExtension ~= filetype and not file_exists(imageBaseName .. filetype) then
+            convertImage(imageBaseName .. imageExtension, imageBaseName .. filetype)
+        end
+    else  --Local image.
+        _, _, imageBaseName, imageExtension = string.find(imageFile, "([^/]*)(%.%a-)$")
+        if imageExtension == ".tex" then
+            imageExtension = ".pdf"
+            -- TODO: Use pandoc.mediabag?
+            if not file_exists(IMAGE_PATH .. imageBaseName .. imageExtension) then
+                typeset(IMAGE_PATH, imageFile)
+            end
+        -- TODO: Use pandoc.mediabag?
+        elseif not file_exists(IMAGE_PATH .. imageBaseName .. imageExtension) then
+            os.execute("cp " .. imageFile .. " " .. IMAGE_PATH .. imageBaseName .. imageExtension)
+        end
+        imageBaseName = IMAGE_PATH .. imageBaseName
+        -- Convert image if necessary....
+        -- TODO: Use pandoc.mediabag?
+        if imageExtension ~= filetype and not file_exists(imageBaseName .. filetype) then
+            convertImage(imageFile, imageBaseName .. filetype)
+        end
+    end
+    local title = image.title or ""
+    local attr = pandoc.Attr(image.identifier, image.classes, image.attributes)
+    return pandoc.Image(image.caption, imageBaseName .. filetype, title, attr)
+end
+
+
+function tikz2image(tikz, filetype, outfile)
+    local tmphead = os.tmpname()
+    local tmpdir = string.match(tmphead, "^(.*[\\/])") or "."
+    local f = io.open(tmphead .. ".tex", 'w')
+    f:write(tikz)
+    f:close()
+    -- os.execute("pdflatex -output-directory " .. tmpdir .. " " .. tmphead)
+    typeset(tmpdir, tmphead)
+    if filetype == '.pdf' then
+        os.rename(tmphead .. ".pdf", outfile)
+    else
+        os.execute("convert -density 300 " .. tmphead .. ".pdf -quality 100 " .. outfile)
+    end
+    os.remove(tmphead .. ".tex")
+    os.remove(tmphead .. ".pdf")
+end
+
+
+function handleCode(code)
+    if code.classes[1] == 'tikz' then
+        local font = DEFAULT_FONT
+        if YAML_VARS.fontfamily then
+            font = YAML_VARS.fontfamily[1].c
+        end
+        local filetype = ".png"
+        if isLaTeX(FORMAT) then
+            filetype = ".pdf"
+        end
+        -- TODO: Use pandoc.mediabag?
+        local outfile = IMAGE_PATH .. pandoc.sha1(code.text .. font) .. filetype
+        print("HERE: " .. outfile)
+        local caption = code.attributes.caption or ""
+        local formattedCaption = pandoc.read(caption).blocks
+        if formattedCaption[1] then
+            formattedCaption = formattedCaption[1].c
+        else
+            formattedCaption = {}
+        end
+        if not file_exists(outfile) then
+            local library = code.attributes.tikzlibrary or ""
+            local codeHeader = "\\documentclass{standalone}\n" ..
+                               "\\usepackage{" .. font .. "}\n" ..
+                               "\\usepackage{tikz}\n"
+            if library then
+                codeHeader = codeHeader .. "\\usetikzlibrary{" .. library .. "}\n"
+            end
+            codeHeader = codeHeader .. "\\begin{document}\n"
+            local codeFooter = "\n\\end{document}\n"
+            tikz2image(codeHeader .. code.text .. codeFooter, filetype, outfile)
+            print('Created image ' .. outfile)
+        else
+            print(outfile .. ' already exists.')
+        end
+        local title = code.title or ""
+        local attr = pandoc.Attr(code.identifier, code.classes, code.attributes)
+        return pandoc.Para({pandoc.Image(formattedCaption, outfile, title, attr)})
+    end
 end
 
 
@@ -408,7 +588,6 @@ function handleBlocks(block)
     end
 end
 
-
 function handlePars(para)
     if FORMAT == "markdown" then  -- Don't change anything if translating to .md
         return
@@ -423,6 +602,12 @@ function handlePars(para)
         elseif FORMAT == "docx" then
             return pandoc.Plain({DOCX_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
         end
+    elseif #para.content == 2 and para.content[1].text == "@" and para.content[2].t == "Link" then
+        -- Process file transclusion
+        local file = io.open(para.content[2].target, "r")
+        local text = file:read("*all")
+        file:close()
+        return pandoc.read(text).blocks
     end
 end
 
@@ -432,6 +617,7 @@ function handleInlines(span)
     if FORMAT == "markdown" then  -- Don't change anything if translating to .md
         return
     elseif span.classes[1] == "comment" or span.classes[1] == "margin" or span.classes[1] == "fixme" or span.classes[1] == "highlight" then
+        -- Process comments ...
         if not YAML_VARS.draft then
             if span.classes[1] == "fixme" or span.classes[1] == "highlight" then
                 return span.content
@@ -458,13 +644,14 @@ function handleInlines(span)
     elseif span.classes[1] == "smcaps" then
         return pandoc.SmallCaps(span.content)
     elseif span.classes[1] == "i" then
+        -- Process indexing only in LaTeX ...
         if isLaTeX(FORMAT) then
             return {latex("\\index{" .. pandoc.utils.stringify(span) .. "}")}
         else
             return {}
         end
-    -- TODO: Everything below needs testing! (Should I be returning tables?)
     elseif span.classes[1] == "l" or span.classes[1] == "r" or span.classes[1] == "rp" then
+        -- Process cross-references ...
         content = pandoc.utils.stringify(span.content)
         if isLaTeX(FORMAT) then
             local prefix = LATEX_TEXT[span.classes[1]].Open
@@ -486,62 +673,18 @@ function handleInlines(span)
     end
 end
 
-
-function tikz2image(tikz, filetype, outfile)
-    local tmphead = os.tmpname()
-    local tmpdir = string.match(tmphead, "^(.*[\\/])") or "."
-    local f = io.open(tmphead .. ".tex", 'w')
-    f:write(tikz)
-    f:close()
-    os.execute("pdflatex -output-directory " .. tmpdir .. " " .. tmphead)
-    if filetype == '.pdf' then
-        os.rename(tmphead .. ".pdf", outfile)
-    else
-        os.execute("convert -density 300 " .. tmphead .. ".pdf -quality 100 " .. outfile)
-    end
-    os.remove(tmphead .. ".tex")
-    os.remove(tmphead .. ".pdf")
-    os.remove(tmphead .. ".log")
-    os.remove(tmphead .. ".aux")
+function typeset(outputLocation, filehead)
+    os.execute("pdflatex -output-directory " .. outputLocation .. " " .. filehead)
 end
 
-
-function handleCode(code)
-    if code.classes[1] == 'tikz' then
-        local font = DEFAULT_FONT
-        if YAML_VARS.fontfamily then
-            font = YAML_VARS.fontfamily[1].c
+function handleMacros(math)
+    if YAML_VARS.macros then
+        for key, value in pairs(YAML_VARS.macros[1]) do
+            if math.text == key then
+                return value
+            end
         end
-        local filetype = "png"
-        if isLaTeX(FORMAT) then
-            filetype = ".pdf"
-        end
-        local outfile = IMAGE_PATH .. pandoc.sha1(code.text .. font) .. "." .. filetype
-        local caption = code.attributes.caption or ""
-        local formattedCaption = pandoc.read(caption).blocks[1].c
-        local library = code.attributes.tikzlibrary or ""
-        local codeHeader = "\\documentclass{standalone}\n" ..
-                           "\\usepackage{" .. font .. "}\n" ..
-                           "\\usepackage{tikz}\n"
-        if library then
-            codeHeader = codeHeader .. "\\usetikzlibrary{" .. library .. "}\n"
-        end
-        codeHeader = codeHeader .. "\\begin{document}\n"
-        local codeFooter = "\n\\end{document}\n"
-        tikz2image(codeHeader .. code.text .. codeFooter, filetype, outfile)
-        print('Created image ' .. outfile)
-        local title = code.attributes.title or ""
-        local attr = pandoc.Attr(code.identifier, code.classes, code.attributes)
-        return pandoc.Para({pandoc.Image(formattedCaption, outfile, title, attr)})
     end
-end
-
-
-function handleStrings(string)
-    if string.text:match("%P") then
-        WORD_COUNT = WORD_COUNT + 1
-    end
-    return
 end
 
 
@@ -556,13 +699,27 @@ function handleNotes(note)
 end
 
 
-return {
-    {Meta = getYAML},
-    {Span = handleInlines},
-    {Para = handlePars},
-    {Div = handleBlocks},
-    {CodeBlock = handleCode},
-    {Note = handleNotes},
-    {Str = handleStrings},
-    {Meta = setYAML}
+function handleStrings(string)
+    if string.text:match("%P") then
+        WORD_COUNT = WORD_COUNT + 1
+    end
+    return
+end
+
+
+-- Order matters here!
+local COMMENT_FILTER = {
+    {Meta = fixYAMLHeader},   -- FIXME: Should be in a separate filter!
+    {Meta = getYAML},         -- This comes first to read metadata values
+    {Para = handlePars},      -- Transclusion before other filters
+    {Image = handleImages},   -- Images (so captions get inline filters)
+    {CodeBlock = handleCode}, -- ... more images
+    {Div = handleBlocks},     -- Comment blocks
+    {Math = handleMacros},    -- Replace macros from YAML data
+    {Span = handleInlines},   -- Comment and cross-ref inlines
+    {Note = handleNotes},     -- Count words
+    {Str = handleStrings},    -- Count words
+    {Meta = setYAML}          -- This comes last to rewrite YAML
 }
+
+return COMMENT_FILTER
