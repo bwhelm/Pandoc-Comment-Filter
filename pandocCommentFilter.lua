@@ -218,7 +218,7 @@ HTML_TEXT.margin.Close = html('</span>')
 HTML_TEXT.fixme = {}
 HTML_TEXT.fixme.Open = html(string.format('<span style="color: %s; %s">Fix this!</span><span style="color: %s;">', COLORS.fixme, MARGIN_STYLE, COLORS.fixme))
 HTML_TEXT.fixme.Close = html('</span>')
-HTML_TEXT.noindent = html('<p class="noindent">')
+HTML_TEXT.noindent = html('<p style="text-indent: 0px">')
 HTML_TEXT.l = {}
 HTML_TEXT.l.Open = '<a name="'
 HTML_TEXT.l.Close = '"></a>'
@@ -292,18 +292,19 @@ DOCX_TEXT.fixme.Open = docx('<w:rPr><w:color w:val="0000FF"/></w:rPr><w:t>')
 DOCX_TEXT.fixme.Close = docx('</w:t>')
 DOCX_TEXT.noindent = docx('')
 DOCX_TEXT.l = {}
-DOCX_TEXT.l.Open = ''
-DOCX_TEXT.l.Close = ''
+DOCX_TEXT.l.Open = docx('')
+DOCX_TEXT.l.Close = docx('')
 DOCX_TEXT.r = {}
-DOCX_TEXT.r.Open = ''
-DOCX_TEXT.r.Close = ''
+DOCX_TEXT.r.Open = docx('')
+DOCX_TEXT.r.Close = docx('')
 DOCX_TEXT.rp = {}
-DOCX_TEXT.rp.Open = ''
-DOCX_TEXT.rp.Close = ''
+DOCX_TEXT.rp.Open = docx('')
+DOCX_TEXT.rp.Close = docx('')
 
 
 -- html code for producing a margin comment
-local MARGIN_STYLE = "max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;"
+local MARGIN_STYLE = "max-width:20%; border: 1px solid black; padding: 1ex; " ..
+                     "margin: 1ex; float:right; font-size: small;"
 
 -- Used to store YAML variables (to check for `draft` status and for potential
 -- modification later).
@@ -317,10 +318,12 @@ local BOX_USED = false
 local WORD_COUNT = 0
 local ABSTRACT_COUNT = 0
 local NOTE_COUNT = 0
+local YAML_WORDS = 0 -- Used for counting number of words in YAML values (to be subtracted)
 
 
-function isHTML(text)
-    if text == "html" or text == "html4" or text == "html5"  then
+function isHTML(format)
+    -- Returns true/false if format is one that uses HTML
+    if format == "html5" or format == "html" or format == "html4"  then
         return true
     else
         return false
@@ -328,40 +331,57 @@ function isHTML(text)
 end
 
 
-function isLaTeX(text)
-    if text == "latex" or text == "beamer" then
+function isLaTeX(format)
+    -- Returns true/false if format is one that uses LaTeX
+    if format == "latex" or format == "beamer" then
         return true
     else
         return false
     end
+end
+
+
+function isWord(text)
+    -- Returns true/false if text contains word characters (not just punctuation)
+    return text:match("%P")
 end
 
 
 function getYAML(meta)
+    -- Record metadata for later use, and count words.
     for key, value in pairs(meta) do
-        if type(value) == "boolean" then
-            YAML_VARS[key] = value
-        elseif type(value) == "table" then
-            YAML_VARS[key] = value
-        end
-    end
-    if YAML_VARS.abstract then
-        local abstract = YAML_VARS.abstract
-        local content = ""
-        if abstract.t == "MetaBlocks" then
-            for _, block in pairs(abstract) do
-                pandoc.walk_block(block, {
-                    Str = function(string)
-                        if string.text:match("%P") then
+        YAML_VARS[key] = value
+        if type(value) ~= "boolean" then
+            -- count words in YAML header, keeping track of those in abstract.
+            if value.t == "MetaBlocks" then
+                for _, block in pairs(value) do
+                    pandoc.walk_block(block, {
+                        Str = function(string)
+                            if isWord(string.text) then
+                                YAML_WORDS = YAML_WORDS + 1
+                                if key == "abstract" then
+                                    ABSTRACT_COUNT = ABSTRACT_COUNT + 1
+                                end
+                            end
+                            return
+                        end})
+                end
+            elseif value.t == "MetaList" then
+                for _, item in pairs(value) do
+                    for _, inline in pairs(item) do
+                        if inline.t == "Str" and isWord(inline.text) then
+                            YAML_WORDS = YAML_WORDS + 1
+                        end
+                    end
+                end
+            elseif value.t == "MetaInlines" then
+                for _, inline in pairs(value) do
+                    if inline.t == "Str" and isWord(inline.text) then
+                        YAML_WORDS = YAML_WORDS + 1
+                        if key == "abstract" then
                             ABSTRACT_COUNT = ABSTRACT_COUNT + 1
                         end
-                        return
-                    end})
-            end
-        elseif abstract.t == "MetaInlines" then
-            for _, inline in pairs(abstract) do
-                if inline.t == "Str" and inline.text:match("%P") then
-                    ABSTRACT_COUNT = ABSTRACT_COUNT + 1
+                    end
                 end
             end
         end
@@ -369,49 +389,8 @@ function getYAML(meta)
 end
 
 
-function getPathToBibFile(file)
-    local handle = io.popen('kpsewhich ' .. file)
-    local bibEntry = handle:read("l")
-    handle:close()
-    return bibEntry
-end
-
-
-function fixYAMLHeader(meta)
-    if FORMAT ~= 'latex' then  -- Need to cope with csl style....
-        if meta.csl then
-            meta.csl[1].c = string.gsub(meta.csl[1].c, "~", os.getenv('HOME'))
-        elseif not meta.csl then
-            local intextCSL = os.getenv('HOME') .. '/.pandoc/chicago-manual-of-style-16th-edition-full-in-text.csl'
-            local notesCSL = os.getenv('HOME') .. '/.pandoc/chicago-fullnote-bibliography.csl'
-            if meta.bibinline then
-                meta.csl = pandoc.MetaInlines(pandoc.Str(intextCSL))
-            else
-                meta.csl = pandoc.MetaInlines(pandoc.Str(notesCSL))
-            end
-        end
-    end
-    if meta.geometry and meta.geometry[1].c == 'ipad' then
-        if meta.book then
-            meta.geometry[1].c = 'paperwidth=176mm,paperheight=234mm,outer=22mm,top=2.5pc,bottom=3pc,headsep=1pc,includehead,includefoot,centering,inner=22mm,marginparwidth=17mm'
-        else
-            meta.geometry[1].c = 'paperwidth=176mm,paperheight=234mm,width=360.0pt,height=541.40024pt,headsep=1pc,centering'
-        end
-    end
-    if meta.bibliography then
-        if meta.bibliography.t == "MetaList" then
-            for key, value in pairs(meta.bibliography) do
-                meta.bibliography[key][1].c = getPathToBibFile(value[1].c)
-            end
-        elseif meta.bibliography.t == "MetaInlines" then
-            meta.bibliography[1].c = getPathToBibFile(meta.bibliography[1].c)
-        end
-    end
-    return meta
-end
-
-
 function setYAML(meta)
+    -- Revise document metadata as appropriate; print detailed wordcount.
     if FORMAT == "markdown" then  -- Don't change anything if translating to .md
         return
     elseif BOX_USED and (isLaTeX(FORMAT)) then
@@ -423,12 +402,15 @@ function setYAML(meta)
             table.insert(meta["header-includes"], pandoc.MetaList(rawInlines))
         end
     end
-    print(string.format("Words:%6d │ Abstract:%4d │ Notes:%5d │ Body:%6d", WORD_COUNT, ABSTRACT_COUNT, NOTE_COUNT, WORD_COUNT - NOTE_COUNT - ABSTRACT_COUNT))
+    print(string.format("Words:%6d │ Abstract:%4d │ Notes:%5d │ Body:%6d",
+          WORD_COUNT - YAML_WORDS + ABSTRACT_COUNT, ABSTRACT_COUNT, NOTE_COUNT,
+          WORD_COUNT - NOTE_COUNT - YAML_WORDS))
     return meta
 end
 
 
-local function file_exists(name)
+local function fileExists(name)
+    -- Returns true/false depending on whether file exists
     local file = io.open(name, 'r')
     if file == nil then
         return false
@@ -440,8 +422,15 @@ end
 
 
 function convertImage(imageToConvert, convertedImage)
+    -- Converts image to new file format
     print("Converting to " .. convertedImage .. "...")
-    os.execute("convert -density 300 " .. imageToConvert .. " -quality 100 " .. convertedImage)
+    os.execute("convert -density 300 " .. imageToConvert ..
+               " -quality 100 " .. convertedImage)
+end
+
+
+function typeset(outputLocation, filehead)
+    os.execute("pdflatex -output-directory " .. outputLocation .. " " .. filehead)
 end
 
 
@@ -461,7 +450,7 @@ function handleImages(image)
         -- It's an online image; need to download to IMAGE_PATH
         -- TODO: Use pandoc.mediabag?
         imageBaseName = IMAGE_PATH .. imageBaseName
-        if file_exists(imageBaseName .. imageExtension) then
+        if fileExists(imageBaseName .. imageExtension) then
             print(imageFile .. " already exists.")
         else
             print("Downloading " .. imageFile .. " to " .. imageBaseName .. imageExtension .. ".")
@@ -471,7 +460,7 @@ function handleImages(image)
             os.execute("touch " .. imageBaseName .. imageExtension)
         end
         -- Convert image if necessary....
-        if imageExtension ~= filetype and not file_exists(imageBaseName .. filetype) then
+        if imageExtension ~= filetype and not fileExists(imageBaseName .. filetype) then
             convertImage(imageBaseName .. imageExtension, imageBaseName .. filetype)
         end
     else  --Local image.
@@ -479,17 +468,18 @@ function handleImages(image)
         if imageExtension == ".tex" then
             imageExtension = ".pdf"
             -- TODO: Use pandoc.mediabag?
-            if not file_exists(IMAGE_PATH .. imageBaseName .. imageExtension) then
+            if not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
                 typeset(IMAGE_PATH, imageFile)
             end
+            imageFile = IMAGE_PATH .. imageBaseName .. imageExtension
         -- TODO: Use pandoc.mediabag?
-        elseif not file_exists(IMAGE_PATH .. imageBaseName .. imageExtension) then
+        elseif not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
             os.execute("cp " .. imageFile .. " " .. IMAGE_PATH .. imageBaseName .. imageExtension)
         end
         imageBaseName = IMAGE_PATH .. imageBaseName
         -- Convert image if necessary....
         -- TODO: Use pandoc.mediabag?
-        if imageExtension ~= filetype and not file_exists(imageBaseName .. filetype) then
+        if imageExtension ~= filetype and not fileExists(imageBaseName .. filetype) then
             convertImage(imageFile, imageBaseName .. filetype)
         end
     end
@@ -500,17 +490,19 @@ end
 
 
 function tikz2image(tikz, filetype, outfile)
+    -- Given text of a TikZ LaTeX image, create an image of given filetype in
+    -- given location.
     local tmphead = os.tmpname()
     local tmpdir = string.match(tmphead, "^(.*[\\/])") or "."
     local f = io.open(tmphead .. ".tex", 'w')
     f:write(tikz)
     f:close()
-    -- os.execute("pdflatex -output-directory " .. tmpdir .. " " .. tmphead)
     typeset(tmpdir, tmphead)
     if filetype == '.pdf' then
         os.rename(tmphead .. ".pdf", outfile)
     else
-        os.execute("convert -density 300 " .. tmphead .. ".pdf -quality 100 " .. outfile)
+        os.execute("convert -density 300 " ..
+                   tmphead .. ".pdf -quality 100 " .. outfile)
     end
     os.remove(tmphead .. ".tex")
     os.remove(tmphead .. ".pdf")
@@ -529,7 +521,6 @@ function handleCode(code)
         end
         -- TODO: Use pandoc.mediabag?
         local outfile = IMAGE_PATH .. pandoc.sha1(code.text .. font) .. filetype
-        print("HERE: " .. outfile)
         local caption = code.attributes.caption or ""
         local formattedCaption = pandoc.read(caption).blocks
         if formattedCaption[1] then
@@ -537,7 +528,7 @@ function handleCode(code)
         else
             formattedCaption = {}
         end
-        if not file_exists(outfile) then
+        if not fileExists(outfile) then
             local library = code.attributes.tikzlibrary or ""
             local codeHeader = "\\documentclass{standalone}\n" ..
                                "\\usepackage{" .. font .. "}\n" ..
@@ -673,10 +664,6 @@ function handleInlines(span)
     end
 end
 
-function typeset(outputLocation, filehead)
-    os.execute("pdflatex -output-directory " .. outputLocation .. " " .. filehead)
-end
-
 function handleMacros(math)
     if YAML_VARS.macros then
         for key, value in pairs(YAML_VARS.macros[1]) do
@@ -691,7 +678,7 @@ end
 function handleNotes(note)
     return pandoc.walk_inline(note, {
         Str = function(string)
-            if string.text:match("%P") then
+            if isWord(string.text) then
                 NOTE_COUNT = NOTE_COUNT + 1
             end
             return
@@ -700,8 +687,8 @@ end
 
 
 function handleStrings(string)
-    if string.text:match("%P") then
-        WORD_COUNT = WORD_COUNT + 1
+    if isWord(string.text) then  -- If string contains non-punctuation chars
+        WORD_COUNT = WORD_COUNT + 1  -- ... count it.
     end
     return
 end
@@ -709,7 +696,6 @@ end
 
 -- Order matters here!
 local COMMENT_FILTER = {
-    {Meta = fixYAMLHeader},   -- FIXME: Should be in a separate filter!
     {Meta = getYAML},         -- This comes first to read metadata values
     {Para = handlePars},      -- Transclusion before other filters
     {Image = handleImages},   -- Images (so captions get inline filters)
