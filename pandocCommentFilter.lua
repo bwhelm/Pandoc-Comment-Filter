@@ -35,8 +35,8 @@ following form , where `comment`, `box`, `speaker` or `center` can fill in for
     Text of block CLASS item...
     :::
 
-FIXME: I cannot nest block elements nicely: boxed text within comment blocks
-are not colored (but they are omitted when `draft` is false).
+FIXME: I cannot nest block elements nicely in LaTeX: boxed text within comment
+blocks are not colored (but they are omitted when `draft` is false).
 
 ## Inline Items:
 
@@ -117,7 +117,7 @@ use, there should be no problem.
 ----------------------------------------------------------------------------]]
 
 
-inspect = require('inspect')
+-- inspect = require('inspect')
 
 -- Colors for various comment types
 local COLORS = {}
@@ -130,9 +130,13 @@ COLORS.fixme     = 'cyan'
 -- Location to save completed images
 -- FIXME: Should I get rid of this? It's better not to rely on hard-coded
 -- paths, but the benefit is that I can store images there and not have to
--- regenerate or reconvert them.
+-- regenerate or reconvert them. Perhaps I should have a metadata value for
+-- `tempdir`, which provides this value, and I use ~/tmp/pandoc as a default,
+-- adding /Figures onto that for the IMAGE_PATH.
 local HOME_PATH = os.getenv('HOME')
-local IMAGE_PATH = HOME_PATH .. "/tmp/pandoc/Figures/"
+-- FIXME: I should ensure that this directory exists!
+local IMAGE_PATH = HOME_PATH .. '/tmp/pandoc/Figures/'
+
 -- Default font for `tikz` figures
 local DEFAULT_FONT = 'fbb'
 
@@ -156,6 +160,10 @@ function docx(text)
     return pandoc.RawInline("openxml", text)
 end
 
+
+-- html code for producing a margin comment
+local MARGIN_STYLE = "max-width:20%; border: 1px solid black; padding: 1ex; " ..
+                     "margin: 1ex; float:right; font-size: small;"
 
 local LATEX_TEXT = {}
 LATEX_TEXT.block_comment = {}
@@ -302,10 +310,6 @@ DOCX_TEXT.rp.Open = docx('')
 DOCX_TEXT.rp.Close = docx('')
 
 
--- html code for producing a margin comment
-local MARGIN_STYLE = "max-width:20%; border: 1px solid black; padding: 1ex; " ..
-                     "margin: 1ex; float:right; font-size: small;"
-
 -- Used to store YAML variables (to check for `draft` status and for potential
 -- modification later).
 local YAML_VARS = {}
@@ -380,6 +384,9 @@ function getYAML(meta)
                         YAML_WORDS = YAML_WORDS + 1
                         if key == "abstract" then
                             ABSTRACT_COUNT = ABSTRACT_COUNT + 1
+                        -- elseif key == "tempdir" then
+                        --     -- Set IMAGE_PATH from metadata
+                        --     IMAGE_PATH = pandoc.utils.stringify(value.c) .. '/Figures/'
                         end
                     end
                 end
@@ -406,6 +413,37 @@ function setYAML(meta)
           WORD_COUNT - YAML_WORDS + ABSTRACT_COUNT, ABSTRACT_COUNT, NOTE_COUNT,
           WORD_COUNT - NOTE_COUNT - YAML_WORDS))
     return meta
+end
+
+
+function handleTransclusion(para)
+    -- Process file transclusion
+    if FORMAT == "markdown" then  -- Don't change anything if translating to .md
+        return
+    elseif #para.content == 2 and para.content[1].text == "@" and para.content[2].t == "Link" then
+        local file = io.open(para.content[2].target, "r")
+        local text = file:read("*all")
+        file:close()
+        return pandoc.read(text).blocks
+    end
+end
+
+
+function handleNoIndent(para)
+    if FORMAT == "markdown" then  -- Don't change anything if translating to .md
+        return
+    elseif #para.content > 2 and para.content[1].text == "<" and para.content[2].t == 'Space' then
+        -- Don't indent paragraph that starts with "< "
+        if isLaTeX(FORMAT) then
+            return pandoc.Para({LATEX_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
+        elseif isHTML(FORMAT) then
+            return pandoc.Plain({HTML_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
+        elseif FORMAT == "revealjs" then
+            return pandoc.Plain({REVEALJS_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
+        elseif FORMAT == "docx" then
+            return pandoc.Plain({DOCX_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
+        end
+    end
 end
 
 
@@ -448,7 +486,6 @@ function handleImages(image)
     _, _, imageBaseName, imageExtension = string.find(imageFile, "([^/]*)(%.%a-)$")
     if string.find(imageFile, "^https?://") then
         -- It's an online image; need to download to IMAGE_PATH
-        -- TODO: Use pandoc.mediabag?
         imageBaseName = IMAGE_PATH .. imageBaseName
         if fileExists(imageBaseName .. imageExtension) then
             print(imageFile .. " already exists.")
@@ -467,25 +504,21 @@ function handleImages(image)
         _, _, imageBaseName, imageExtension = string.find(imageFile, "([^/]*)(%.%a-)$")
         if imageExtension == ".tex" then
             imageExtension = ".pdf"
-            -- TODO: Use pandoc.mediabag?
             if not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
                 typeset(IMAGE_PATH, imageFile)
             end
             imageFile = IMAGE_PATH .. imageBaseName .. imageExtension
-        -- TODO: Use pandoc.mediabag?
         elseif not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
             os.execute("cp " .. imageFile .. " " .. IMAGE_PATH .. imageBaseName .. imageExtension)
         end
         imageBaseName = IMAGE_PATH .. imageBaseName
         -- Convert image if necessary....
-        -- TODO: Use pandoc.mediabag?
         if imageExtension ~= filetype and not fileExists(imageBaseName .. filetype) then
             convertImage(imageFile, imageBaseName .. filetype)
         end
     end
-    local title = image.title or ""
     local attr = pandoc.Attr(image.identifier, image.classes, image.attributes)
-    return pandoc.Image(image.caption, imageBaseName .. filetype, title, attr)
+    return pandoc.Image(image.caption, imageBaseName .. filetype, image.title, attr)
 end
 
 
@@ -519,7 +552,6 @@ function handleCode(code)
         if isLaTeX(FORMAT) then
             filetype = ".pdf"
         end
-        -- TODO: Use pandoc.mediabag?
         local outfile = IMAGE_PATH .. pandoc.sha1(code.text .. font) .. filetype
         local caption = code.attributes.caption or ""
         local formattedCaption = pandoc.read(caption).blocks
@@ -579,30 +611,17 @@ function handleBlocks(block)
     end
 end
 
-function handlePars(para)
-    if FORMAT == "markdown" then  -- Don't change anything if translating to .md
-        return
-    elseif #para.content > 2 and para.content[1].text == "<" and para.content[2].t == 'Space' then
-        -- Don't indent paragraph that starts with "< "
-        if isLaTeX(FORMAT) then
-            return pandoc.Para({LATEX_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
-        elseif isHTML(FORMAT) then
-            return pandoc.Plain({HTML_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
-        elseif FORMAT == "revealjs" then
-            return pandoc.Plain({REVEALJS_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
-        elseif FORMAT == "docx" then
-            return pandoc.Plain({DOCX_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
+
+function handleMacros(math)
+    if YAML_VARS.macros then
+        for key, value in pairs(YAML_VARS.macros[1]) do
+            if math.text == key then
+                return value
+            end
         end
-    elseif #para.content == 2 and para.content[1].text == "@" and para.content[2].t == "Link" then
-        -- Process file transclusion
-        local file = io.open(para.content[2].target, "r")
-        local text = file:read("*all")
-        file:close()
-        return pandoc.read(text).blocks
     end
 end
 
-local CURRENT_COLOR = "black"
 
 function handleInlines(span)
     if FORMAT == "markdown" then  -- Don't change anything if translating to .md
@@ -664,16 +683,6 @@ function handleInlines(span)
     end
 end
 
-function handleMacros(math)
-    if YAML_VARS.macros then
-        for key, value in pairs(YAML_VARS.macros[1]) do
-            if math.text == key then
-                return value
-            end
-        end
-    end
-end
-
 
 function handleNotes(note)
     return pandoc.walk_inline(note, {
@@ -696,16 +705,17 @@ end
 
 -- Order matters here!
 local COMMENT_FILTER = {
-    {Meta = getYAML},         -- This comes first to read metadata values
-    {Para = handlePars},      -- Transclusion before other filters
-    {Image = handleImages},   -- Images (so captions get inline filters)
-    {CodeBlock = handleCode}, -- ... more images
-    {Div = handleBlocks},     -- Comment blocks
-    {Math = handleMacros},    -- Replace macros from YAML data
-    {Span = handleInlines},   -- Comment and cross-ref inlines
-    {Note = handleNotes},     -- Count words
-    {Str = handleStrings},    -- Count words
-    {Meta = setYAML}          -- This comes last to rewrite YAML
+    {Meta = getYAML},             -- This comes first to read metadata values
+    {Para = handleTransclusion},  -- Transclusion before other filters
+    {Para = handleNoIndent},      -- Non-indented paragraphs (after transclusion)
+    {Image = handleImages},       -- Images (so captions get inline filters)
+    {CodeBlock = handleCode},     -- ... more images
+    {Div = handleBlocks},         -- Comment blocks
+    {Math = handleMacros},        -- Replace macros from YAML data
+    {Span = handleInlines},       -- Comment and cross-ref inlines
+    {Note = handleNotes},         -- Count words
+    {Str = handleStrings},        -- Count words
+    {Meta = setYAML}              -- This comes last to rewrite YAML
 }
 
 return COMMENT_FILTER
