@@ -483,8 +483,8 @@ function handleImages(image)
     end
     local imageFile = image.src
     local imageBaseName, imageExtension
-    _, _, imageBaseName, imageExtension = string.find(imageFile, "([^/]*)(%.%a-)$")
-    if string.find(imageFile, "^https?://") then
+    _, _, imageBaseName, imageExtension = imageFile:find("([^/]*)(%.%a-)$")
+    if imageFile:find("^https?://") then
         -- It's an online image; need to download to IMAGE_PATH
         imageBaseName = IMAGE_PATH .. imageBaseName
         if fileExists(imageBaseName .. imageExtension) then
@@ -501,7 +501,7 @@ function handleImages(image)
             convertImage(imageBaseName .. imageExtension, imageBaseName .. filetype)
         end
     else  --Local image.
-        _, _, imageBaseName, imageExtension = string.find(imageFile, "([^/]*)(%.%a-)$")
+        _, _, imageBaseName, imageExtension = imageFile:find("([^/]*)(%.%a-)$")
         if imageExtension == ".tex" then
             imageExtension = ".pdf"
             if not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
@@ -526,7 +526,7 @@ function tikz2image(tikz, filetype, outfile)
     -- Given text of a TikZ LaTeX image, create an image of given filetype in
     -- given location.
     local tmphead = os.tmpname()
-    local tmpdir = string.match(tmphead, "^(.*[\\/])") or "."
+    local tmpdir = tmphead:match("^(.*[\\/])") or "."
     local f = io.open(tmphead .. ".tex", 'w')
     f:write(tikz)
     f:close()
@@ -575,7 +575,19 @@ function handleCode(code)
         else
             print(outfile .. ' already exists.')
         end
-        local title = code.title or ""
+        local title = code.attributes.title or ""
+        -- Undocumented "feature" in pandoc: figures (as opposed to inline
+        -- images) are created only if the title starts with "fig:", so this
+        -- adds it if it's not already there. (See
+        -- <https://groups.google.com/d/msg/pandoc-discuss/6GdEFG0N-VA/v3ayZPveEQAJ>.)
+        begin, finish = title:find('fig:')
+        if begin ~= 1 then
+            title = 'fig:' .. title
+        end
+        code.attributes.caption = nil
+        code.attributes.tikzlibrary = nil
+        code.attributes.title = nil
+        code.classes[1] = nil
         local attr = pandoc.Attr(code.identifier, code.classes, code.attributes)
         return pandoc.Para({pandoc.Image(formattedCaption, outfile, title, attr)})
     end
@@ -708,8 +720,8 @@ local COMMENT_FILTER = {
     {Meta = getYAML},             -- This comes first to read metadata values
     {Para = handleTransclusion},  -- Transclusion before other filters
     {Para = handleNoIndent},      -- Non-indented paragraphs (after transclusion)
+    {CodeBlock = handleCode},     -- Convert TikZ images (before Image)
     {Image = handleImages},       -- Images (so captions get inline filters)
-    {CodeBlock = handleCode},     -- ... more images
     {Div = handleBlocks},         -- Comment blocks
     {Math = handleMacros},        -- Replace macros from YAML data
     {Span = handleInlines},       -- Comment and cross-ref inlines
