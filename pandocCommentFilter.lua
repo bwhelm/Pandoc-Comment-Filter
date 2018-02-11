@@ -324,6 +324,12 @@ local ABSTRACT_COUNT = 0
 local NOTE_COUNT = 0
 local YAML_WORDS = 0 -- Used for counting number of words in YAML values (to be subtracted)
 
+-- Used to specify whether to print various note types in draft.
+local COMMENT = true
+local FIXME = true
+local MARGIN = true
+local HIGHLIGHT = true
+
 
 function isHTML(format)
     -- Returns true/false if format is one that uses HTML
@@ -393,6 +399,20 @@ function getYAML(meta)
             end
         end
     end
+    -- Set defaults for inlines if not already set manually.
+    if YAML_VARS.draft then
+        YAML_VARS.comment   = YAML_VARS.comment   or pandoc.MetaInlines({pandoc.Str('draft')})
+        YAML_VARS.margin    = YAML_VARS.margin    or pandoc.MetaInlines({pandoc.Str('draft')})
+        YAML_VARS.fixme     = YAML_VARS.fixme     or pandoc.MetaInlines({pandoc.Str('draft')})
+        YAML_VARS.highlight = YAML_VARS.highlight or pandoc.MetaInlines({pandoc.Str('draft')})
+        YAML_VARS.speaker   = YAML_VARS.speaker   or pandoc.MetaInlines({pandoc.Str('draft')})
+    else
+        YAML_VARS.comment   = YAML_VARS.comment   or pandoc.MetaInlines({pandoc.Str('hide')})
+        YAML_VARS.margin    = YAML_VARS.margin    or pandoc.MetaInlines({pandoc.Str('hide')})
+        YAML_VARS.fixme     = YAML_VARS.fixme     or pandoc.MetaInlines({pandoc.Str('print')})
+        YAML_VARS.highlight = YAML_VARS.highlight or pandoc.MetaInlines({pandoc.Str('print')})
+        YAML_VARS.speaker   = YAML_VARS.speaker   or pandoc.MetaInlines({pandoc.Str('draft')})
+    end
 end
 
 
@@ -400,9 +420,20 @@ function setYAML(meta)
     -- Revise document metadata as appropriate; print detailed wordcount.
     if FORMAT == "markdown" then  -- Don't change anything if translating to .md
         return
-    elseif BOX_USED and (isLaTeX(FORMAT)) then
-        -- Need to add package for LaTeX
+    elseif BOX_USED and (isLaTeX(FORMAT)) then  -- Need to add package for LaTeX
         local rawInlines = {pandoc.MetaInlines({latex("\\RequirePackage{mdframed}")})}
+        if meta["header-includes"] == nil then
+            meta["header-includes"] = pandoc.MetaList(rawInlines)
+        else
+            table.insert(meta["header-includes"], pandoc.MetaList(rawInlines))
+        end
+    end
+    if isLaTeX(FORMAT) and (
+            YAML_VARS.comment[1].c == 'draft' or
+            YAML_VARS.margin[1].c == 'draft' or
+            YAML_VARS.fixme[1].c == 'draft'
+            ) then  -- Need to add package for Latex
+        local rawInlines = {pandoc.MetaInlines({latex("\\RequirePackage{xcolor}")})}
         if meta["header-includes"] == nil then
             meta["header-includes"] = pandoc.MetaList(rawInlines)
         else
@@ -533,6 +564,10 @@ function tikz2image(tikz, filetype, outfile)
     typeset(tmpdir, tmphead)
     if filetype == '.pdf' then
         os.rename(tmphead .. ".pdf", outfile)
+        -- pandoc.mediabag.insert(tmpdir .. tmphead .. '.pdf', mimeType, contents)
+        -- mimeType, contents = pandoc.mediabag.lookup('/Users/bennett/Desktop/dinosaur.jpg')
+        -- print('-------------------------------------------')
+        -- print(mimeType)
     else
         os.execute("convert -density 300 " ..
                    tmphead .. ".pdf -quality 100 " .. outfile)
@@ -598,9 +633,14 @@ function handleBlocks(block)
     if FORMAT == "markdown" then  -- Don't change anything if translating to .md
         return
     elseif isCommentBlock(block.classes[1]) then
-        if not YAML_VARS.draft and (block.classes[1] == "comment" or block.classes[1] == "speaker") then
-            return {}
-        elseif isLaTeX(FORMAT) then
+        if block.classes[1] == "comment" or block.classes[1] == "speaker" then
+            if YAML_VARS[block.classes[1]][1].c == 'hide' then
+                return {}
+            elseif YAML_VARS[block.classes[1]][1].c == 'print' then
+                return block.content
+            end
+        end
+        if isLaTeX(FORMAT) then
             if block.classes[1] == "box" then
                 BOX_USED = true
             end
@@ -638,58 +678,61 @@ end
 function handleInlines(span)
     if FORMAT == "markdown" then  -- Don't change anything if translating to .md
         return
-    elseif span.classes[1] == "comment" or span.classes[1] == "margin" or span.classes[1] == "fixme" or span.classes[1] == "highlight" then
+    end
+    local spanType = span.classes[1]
+    if spanType == "comment" or spanType == "margin" or
+            spanType == "fixme" or spanType == "highlight" then
         -- Process comments ...
-        if not YAML_VARS.draft then
-            if span.classes[1] == "fixme" or span.classes[1] == "highlight" then
-                return span.content
-            else
-                return {}
-            end
-        elseif isLaTeX(FORMAT) then
-            local prefix = {LATEX_TEXT[span.classes[1]].Open}
-            local postfix = {LATEX_TEXT[span.classes[1]].Close}
+        if YAML_VARS[spanType][1].c == 'hide' then
+            return {}
+        elseif YAML_VARS[spanType][1].c == 'print' then
+            return span.content
+        end
+        -- In this case, we want to print with draft markup
+        if isLaTeX(FORMAT) then
+            local prefix = {LATEX_TEXT[spanType].Open}
+            local postfix = {LATEX_TEXT[spanType].Close}
             return prefix .. span.content .. postfix
         elseif isHTML(FORMAT) then
-            local prefix = {HTML_TEXT[span.classes[1]].Open}
-            local postfix = {HTML_TEXT[span.classes[1]].Close}
+            local prefix = {HTML_TEXT[spanType].Open}
+            local postfix = {HTML_TEXT[spanType].Close}
             return prefix .. span.content .. postfix
         elseif FORMAT == "revealjs" then
-            local prefix = {REVEALJS_TEXT[span.classes[1]].Open}
-            local postfix = {REVEALJS_TEXT[span.classes[1]].Close}
+            local prefix = {REVEALJS_TEXT[spanType].Open}
+            local postfix = {REVEALJS_TEXT[spanType].Close}
             return prefix .. span.content .. postfix
         elseif FORMAT == "docx" then
-            local prefix = {DOCX_TEXT[span.classes[1]].Open}
-            local postfix = {DOCX_TEXT[span.classes[1]].Close}
+            local prefix = {DOCX_TEXT[spanType].Open}
+            local postfix = {DOCX_TEXT[spanType].Close}
             return prefix .. span.content .. postfix
         end
-    elseif span.classes[1] == "smcaps" then
+    elseif spanType == "smcaps" then
         return pandoc.SmallCaps(span.content)
-    elseif span.classes[1] == "i" then
+    elseif spanType == "i" then
         -- Process indexing only in LaTeX ...
         if isLaTeX(FORMAT) then
             return {latex("\\index{" .. pandoc.utils.stringify(span) .. "}")}
         else
             return {}
         end
-    elseif span.classes[1] == "l" or span.classes[1] == "r" or span.classes[1] == "rp" then
+    elseif spanType == "l" or spanType == "r" or spanType == "rp" then
         -- Process cross-references ...
         content = pandoc.utils.stringify(span.content)
         if isLaTeX(FORMAT) then
-            local prefix = LATEX_TEXT[span.classes[1]].Open
-            local postfix = LATEX_TEXT[span.classes[1]].Close
+            local prefix = LATEX_TEXT[spanType].Open
+            local postfix = LATEX_TEXT[spanType].Close
             return {latex(prefix .. content .. postfix)}
         elseif isHTML(FORMAT) then
-            local prefix = HTML_TEXT[span.classes[1]].Open
-            local postfix = HTML_TEXT[span.classes[1]].Close
+            local prefix = HTML_TEXT[spanType].Open
+            local postfix = HTML_TEXT[spanType].Close
             return {html(prefix .. content .. postfix)}
         elseif FORMAT == "revealjs" then
-            local prefix = REVEALJS_TEXT[span.classes[1]].Open
-            local postfix = REVEALJS_TEXT[span.classes[1]].Close
+            local prefix = REVEALJS_TEXT[spanType].Open
+            local postfix = REVEALJS_TEXT[spanType].Close
             return {html(prefix .. content .. postfix)}
         elseif FORMAT == "docx" then
-            local prefix = DOCX_TEXT[span.classes[1]].Open
-            local postfix = DOCX_TEXT[span.classes[1]].Close
+            local prefix = DOCX_TEXT[spanType].Open
+            local postfix = DOCX_TEXT[spanType].Close
             return {docx(prefix .. content .. postfix)}
         end
     end
