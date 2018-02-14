@@ -4,8 +4,29 @@ other things I find useful. With `draft: true` in the YAML header, comments and
 margin notes are displayed in red, and text that is highlighted or flagged with
 `fixme` is marked up in the output. With `draft: false` in the YAML header,
 comments and margin notes are not displayed at all, and highlightings and
-`fixme` mark ups are suppressed (though the text is displayed). Also provided
-are markup conventions for cross-references, index entries, and TikZ figures.
+`fixme` mark ups are suppressed (though the text is displayed).
+
+The display of comments, marginal notes, fixmes, and highlighted text in the
+final output can be fine-tuned by setting in the YAML header these to `draft`
+(output as described above when draft is true), `print` (to print them as for
+any normal text), or `hide` (to prevent them from showing up in the final
+output at alal). Thus, the defaults when `draft: true` is set in the YAML
+header is equivent to specifying:
+
+    comment: draft
+    margin: draft
+    fixme: draft
+    highlight: draft
+
+and when `draft: false` is set, it is equivalent to:
+
+    comment: hide
+    margin: hide
+    fixme: print
+    highlight: print
+
+Also provided are markup conventions for cross-references, index entries,
+non-indented paragraphs, boxed text, centered text, and TikZ figures.
 
 Copyright (C) 2017, 2018 Bennett Helm
 
@@ -117,15 +138,13 @@ use, there should be no problem.
 ----------------------------------------------------------------------------]]
 
 
--- inspect = require('inspect')
-
 -- Colors for various comment types
 local COLORS = {}
-COLORS.block_comment   = 'red'
-COLORS.comment   = 'red'
-COLORS.highlight = 'yellow'
-COLORS.margin    = 'red'
-COLORS.fixme     = 'cyan'
+COLORS.block_comment = 'red'
+COLORS.comment       = 'red'
+COLORS.highlight     = 'yellow'
+COLORS.margin        = 'red'
+COLORS.fixme         = 'cyan'
 
 -- Location to save completed images
 -- FIXME: Should I get rid of this? It's better not to rely on hard-coded
@@ -167,7 +186,8 @@ local MARGIN_STYLE = "max-width:20%; border: 1px solid black; padding: 1ex; " ..
 
 local LATEX_TEXT = {}
 LATEX_TEXT.block_comment = {}
-LATEX_TEXT.block_comment.Open = latex(string.format('\\color{%s}{}', COLORS.block_comment))
+LATEX_TEXT.block_comment.Open = latex(string.format('\\color{%s}{}',
+                                      COLORS.block_comment))
 LATEX_TEXT.block_comment.Close = latex('\\color{black}{}')
 LATEX_TEXT.block_box = {}
 LATEX_TEXT.block_box.Open = latex('\\medskip\\begin{mdframed}')
@@ -176,19 +196,25 @@ LATEX_TEXT.block_center = {}
 LATEX_TEXT.block_center.Open = latex('\\begin{center}')
 LATEX_TEXT.block_center.Close = latex('\\end{center}')
 LATEX_TEXT.block_speaker = {}  -- Note: treat <!speaker> just like <!comment>
-LATEX_TEXT.block_speaker.Open = latex(string.format('\\textcolor{%s}{', COLORS.block_comment))
+LATEX_TEXT.block_speaker.Open = latex(string.format('\\textcolor{%s}{',
+                                                    COLORS.block_comment))
 LATEX_TEXT.block_speaker.Close = latex('}')
 LATEX_TEXT.comment = {}
-LATEX_TEXT.comment.Open = latex(string.format('\\textcolor{%s}{', COLORS.comment))
+LATEX_TEXT.comment.Open = latex(string.format('\\textcolor{%s}{',
+                                              COLORS.comment))
 LATEX_TEXT.comment.Close = latex('}')
 LATEX_TEXT.highlight = {}
 LATEX_TEXT.highlight.Open = latex('\\hl{')
 LATEX_TEXT.highlight.Close = latex('}')
 LATEX_TEXT.margin = {}
-LATEX_TEXT.margin.Open = latex(string.format('\\marginpar{\\begin{flushleft}\\scriptsize{\\textcolor{%s}{', COLORS.margin))
+LATEX_TEXT.margin.Open = latex(string.format(
+            '\\marginpar{\\begin{flushleft}\\scriptsize{\\textcolor{%s}{',
+            COLORS.margin))
 LATEX_TEXT.margin.Close = latex('}}\\end{flushleft}}')
 LATEX_TEXT.fixme = {}
-LATEX_TEXT.fixme.Open = latex(string.format('\\marginpar{\\scriptsize{\\textcolor{%s}{Fix this!}}}\\textcolor{%s}{', COLORS.fixme, COLORS.fixme))
+LATEX_TEXT.fixme.Open = latex(string.format(
+            '\\marginpar{\\scriptsize{\\textcolor{%s}{Fix this!}}}\\textcolor{%s}{',
+            COLORS.fixme, COLORS.fixme))
 LATEX_TEXT.fixme.Close = latex('}')
 LATEX_TEXT.noindent = latex('\\noindent{}')
 LATEX_TEXT.l = {}
@@ -203,28 +229,35 @@ LATEX_TEXT.rp.Close = '}'
 
 local HTML_TEXT = {}
 HTML_TEXT.block_comment = {}
-HTML_TEXT.block_comment.Open = html(string.format('<div style="color: %s;">', COLORS.block_comment))
+HTML_TEXT.block_comment.Open = html(string.format('<div style="color: %s;">',
+                                    COLORS.block_comment))
 HTML_TEXT.block_comment.Close = html('</div>')
 HTML_TEXT.block_box = {}
-HTML_TEXT.block_box.Open = html('<div style="border:1px solid black; padding:1.5ex;">')
+HTML_TEXT.block_box.Open =
+            html('<div style="border:1px solid black; padding:1.5ex;">')
 HTML_TEXT.block_box.Close = html('</div>')
 HTML_TEXT.block_center = {}
 HTML_TEXT.block_center.Open = html('<div style="text-align:center";>')
 HTML_TEXT.block_center.Close = html('</div>')
 HTML_TEXT.block_speaker = {}  -- Note: treat <!speaker> just like <!comment>
-HTML_TEXT.block_speaker.Open = html(string.format('<div style="color: %s;">', COLORS.block_comment))
+HTML_TEXT.block_speaker.Open = html(string.format('<div style="color: %s;">',
+                                    COLORS.block_comment))
 HTML_TEXT.block_speaker.Close = html('</div>')
 HTML_TEXT.comment = {}
-HTML_TEXT.comment.Open = html(string.format('<span style="color: %s;">', COLORS.comment))
+HTML_TEXT.comment.Open = html(string.format('<span style="color: %s;">',
+                              COLORS.comment))
 HTML_TEXT.comment.Close = html('</span>')
 HTML_TEXT.highlight = {}
 HTML_TEXT.highlight.Open = html('<mark>')
 HTML_TEXT.highlight.Close = html('</mark>')
 HTML_TEXT.margin = {}
-HTML_TEXT.margin.Open = html(string.format('<span style="color: %s; %s">', COLORS.margin, MARGIN_STYLE))
+HTML_TEXT.margin.Open = html(string.format('<span style="color: %s; %s">',
+                             COLORS.margin, MARGIN_STYLE))
 HTML_TEXT.margin.Close = html('</span>')
 HTML_TEXT.fixme = {}
-HTML_TEXT.fixme.Open = html(string.format('<span style="color: %s; %s">Fix this!</span><span style="color: %s;">', COLORS.fixme, MARGIN_STYLE, COLORS.fixme))
+HTML_TEXT.fixme.Open = html(string.format(
+        '<span style="color: %s; %s">Fix this!</span><span style="color: %s;">',
+        COLORS.fixme, MARGIN_STYLE, COLORS.fixme))
 HTML_TEXT.fixme.Close = html('</span>')
 HTML_TEXT.noindent = html('<p style="text-indent: 0px">')
 HTML_TEXT.l = {}
@@ -239,10 +272,12 @@ HTML_TEXT.rp.Close = '">here</a>'
 
 local REVEALJS_TEXT = {}
 REVEALJS_TEXT.block_comment = {}
-REVEALJS_TEXT.block_comment.Open = html(string.format('<div style="color: %s;">', COLORS.block_comment))
+REVEALJS_TEXT.block_comment.Open = html(string.format(
+        '<div style="color: %s;">', COLORS.block_comment))
 REVEALJS_TEXT.block_comment.Close = html('</div>')
 REVEALJS_TEXT.block_box = {}
-REVEALJS_TEXT.block_box.Open = html('<div style="border:1px solid black; padding:1.5ex;">')
+REVEALJS_TEXT.block_box.Open = html(
+        '<div style="border:1px solid black; padding:1.5ex;">')
 REVEALJS_TEXT.block_box.Close = html('</div>')
 REVEALJS_TEXT.block_center = {}
 REVEALJS_TEXT.block_center.Open = html('<div style="text-align:center";>')
@@ -251,16 +286,20 @@ REVEALJS_TEXT.block_speaker = {}
 REVEALJS_TEXT.block_speaker.Open = html('<aside class="notes">')
 REVEALJS_TEXT.block_speaker.Close = html('</aside>')
 REVEALJS_TEXT.comment = {}
-REVEALJS_TEXT.comment.Open = html(string.format('<span style="color: %s;">', COLORS.comment))
+REVEALJS_TEXT.comment.Open = html(string.format('<span style="color: %s;">',
+                                  COLORS.comment))
 REVEALJS_TEXT.comment.Close = html('</span>')
 REVEALJS_TEXT.highlight = {}
 REVEALJS_TEXT.highlight.Open = html('<mark>')
 REVEALJS_TEXT.highlight.Close = html('</mark>')
 REVEALJS_TEXT.margin = {}
-REVEALJS_TEXT.margin.Open = html(string.format('<span style="color: %s; %s;">', COLORS.margin, MARGIN_STYLE))
+REVEALJS_TEXT.margin.Open = html(string.format(
+        '<span style="color: %s; %s;">', COLORS.margin, MARGIN_STYLE))
 REVEALJS_TEXT.margin.Close = html('</span>')
 REVEALJS_TEXT.fixme = {}
-REVEALJS_TEXT.fixme.Open = html(string.format('<span style="color: %s; %s">Fix this!</span><span style="color: %s;">', COLORS.fixme, MARGIN_STYLE, COLORS.fixme))
+REVEALJS_TEXT.fixme.Open = html(string.format(
+        '<span style="color: %s; %s">Fix this!</span><span style="color: %s;">',
+        COLORS.fixme, MARGIN_STYLE, COLORS.fixme))
 REVEALJS_TEXT.fixme.Close = html('</span>')
 REVEALJS_TEXT.noindent = html('<p class="noindent">')
 REVEALJS_TEXT.l = {}
@@ -300,14 +339,14 @@ DOCX_TEXT.fixme.Open = docx('<w:rPr><w:color w:val="0000FF"/></w:rPr><w:t>')
 DOCX_TEXT.fixme.Close = docx('</w:t>')
 DOCX_TEXT.noindent = docx('')
 DOCX_TEXT.l = {}
-DOCX_TEXT.l.Open = docx('')
-DOCX_TEXT.l.Close = docx('')
+DOCX_TEXT.l.Open = ''
+DOCX_TEXT.l.Close = ''
 DOCX_TEXT.r = {}
-DOCX_TEXT.r.Open = docx('')
-DOCX_TEXT.r.Close = docx('')
+DOCX_TEXT.r.Open = ''
+DOCX_TEXT.r.Close = ''
 DOCX_TEXT.rp = {}
-DOCX_TEXT.rp.Open = docx('')
-DOCX_TEXT.rp.Close = docx('')
+DOCX_TEXT.rp.Open = ''
+DOCX_TEXT.rp.Close = ''
 
 
 -- Used to store YAML variables (to check for `draft` status and for potential
@@ -322,13 +361,19 @@ local BOX_USED = false
 local WORD_COUNT = 0
 local ABSTRACT_COUNT = 0
 local NOTE_COUNT = 0
-local YAML_WORDS = 0 -- Used for counting number of words in YAML values (to be subtracted)
+local YAML_WORDS = 0 -- Used for counting # words in YAML values (to be subtracted)
 
 -- Used to specify whether to print various note types in draft.
 local COMMENT = true
 local FIXME = true
 local MARGIN = true
 local HIGHLIGHT = true
+
+-- FIXME: Used to keep track of current colors for blocks and inlines for LaTeX
+-- ... I'm not sure this is going to work, unless I can determine when the
+-- block or inline ends.
+local CURRENT_BLOCK_COLOR = nil
+local CURRENT_INLINE_COLOR = nil
 
 
 function isHTML(format)
@@ -429,9 +474,9 @@ function setYAML(meta)
         end
     end
     if isLaTeX(FORMAT) and (
-            YAML_VARS.comment[1].c == 'draft' or
-            YAML_VARS.margin[1].c == 'draft' or
-            YAML_VARS.fixme[1].c == 'draft'
+            pandoc.utils.stringify(YAML_VARS.comment) == 'draft' or
+            pandoc.utils.stringify(YAML_VARS.margin) == 'draft' or
+            pandoc.utils.stringify(YAML_VARS.fixme) == 'draft'
             ) then  -- Need to add package for Latex
         local rawInlines = {pandoc.MetaInlines({latex("\\RequirePackage{xcolor}")})}
         if meta["header-includes"] == nil then
@@ -451,7 +496,9 @@ function handleTransclusion(para)
     -- Process file transclusion
     if FORMAT == "markdown" then  -- Don't change anything if translating to .md
         return
-    elseif #para.content == 2 and para.content[1].text == "@" and para.content[2].t == "Link" then
+    elseif #para.content == 2 and
+           para.content[1].text == "@" and
+           para.content[2].t == "Link" then
         local file = io.open(para.content[2].target, "r")
         local text = file:read("*all")
         file:close()
@@ -463,16 +510,22 @@ end
 function handleNoIndent(para)
     if FORMAT == "markdown" then  -- Don't change anything if translating to .md
         return
-    elseif #para.content > 2 and para.content[1].text == "<" and para.content[2].t == 'Space' then
+    elseif #para.content > 2 and
+           para.content[1].text == "<" and
+           para.content[2].t == 'Space' then
         -- Don't indent paragraph that starts with "< "
         if isLaTeX(FORMAT) then
-            return pandoc.Para({LATEX_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
+            return pandoc.Para({LATEX_TEXT.noindent,
+                               table.unpack(para.content, 3, #para.content)})
         elseif isHTML(FORMAT) then
-            return pandoc.Plain({HTML_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
+            return pandoc.Plain({HTML_TEXT.noindent,
+                                table.unpack(para.content, 3, #para.content)})
         elseif FORMAT == "revealjs" then
-            return pandoc.Plain({REVEALJS_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
+            return pandoc.Plain({REVEALJS_TEXT.noindent,
+                                table.unpack(para.content, 3, #para.content)})
         elseif FORMAT == "docx" then
-            return pandoc.Plain({DOCX_TEXT.noindent, table.unpack(para.content, 3, #para.content)})
+            return pandoc.Plain({DOCX_TEXT.noindent,
+                                table.unpack(para.content, 3, #para.content)})
         end
     end
 end
@@ -507,7 +560,8 @@ function handleImages(image)
     -- This will check if an image is online, and will download it; if it is a
     -- .tex file, it will typeset it. Having done this, it will convert to the
     -- proper filetype for desired output.
-    -- pandoc.Image = {{"identifier", "classes", "attributes"}, "caption", {"src", "title"}}
+    -- pandoc.Image = {{"identifier", "classes", "attributes"}, "caption",
+    -- {"src", "title"}}
     local filetype = ".png"
     if isLaTeX(FORMAT) then
         filetype = ".pdf"
@@ -521,14 +575,17 @@ function handleImages(image)
         if fileExists(imageBaseName .. imageExtension) then
             print(imageFile .. " already exists.")
         else
-            print("Downloading " .. imageFile .. " to " .. imageBaseName .. imageExtension .. ".")
-            os.execute("wget --quiet " .. imageFile .. " --output-document=" .. imageBaseName .. imageExtension)
+            print("Downloading " .. imageFile .. " to " .. imageBaseName ..
+                  imageExtension .. ".")
+            os.execute("wget --quiet " .. imageFile .. " --output-document=" ..
+                       imageBaseName .. imageExtension)
             -- Because sometimes the downloaded file is old, this prevents it
             -- from being automatically deleted.
             os.execute("touch " .. imageBaseName .. imageExtension)
         end
         -- Convert image if necessary....
-        if imageExtension ~= filetype and not fileExists(imageBaseName .. filetype) then
+        if imageExtension ~= filetype and
+                not fileExists(imageBaseName .. filetype) then
             convertImage(imageBaseName .. imageExtension, imageBaseName .. filetype)
         end
     else  --Local image.
@@ -540,11 +597,13 @@ function handleImages(image)
             end
             imageFile = IMAGE_PATH .. imageBaseName .. imageExtension
         elseif not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
-            os.execute("cp " .. imageFile .. " " .. IMAGE_PATH .. imageBaseName .. imageExtension)
+            os.execute("cp " .. imageFile .. " " .. IMAGE_PATH ..
+                       imageBaseName .. imageExtension)
         end
         imageBaseName = IMAGE_PATH .. imageBaseName
         -- Convert image if necessary....
-        if imageExtension ~= filetype and not fileExists(imageBaseName .. filetype) then
+        if imageExtension ~= filetype and
+                not fileExists(imageBaseName .. filetype) then
             convertImage(imageFile, imageBaseName .. filetype)
         end
     end
@@ -565,7 +624,8 @@ function tikz2image(tikz, filetype, outfile)
     if filetype == '.pdf' then
         os.rename(tmphead .. ".pdf", outfile)
         -- pandoc.mediabag.insert(tmpdir .. tmphead .. '.pdf', mimeType, contents)
-        -- mimeType, contents = pandoc.mediabag.lookup('/Users/bennett/Desktop/dinosaur.jpg')
+        -- mimeType, contents =
+        --         pandoc.mediabag.lookup('/Users/bennett/Desktop/dinosaur.jpg')
         -- print('-------------------------------------------')
         -- print(mimeType)
     else
@@ -634,9 +694,9 @@ function handleBlocks(block)
         return
     elseif isCommentBlock(block.classes[1]) then
         if block.classes[1] == "comment" or block.classes[1] == "speaker" then
-            if YAML_VARS[block.classes[1]][1].c == 'hide' then
+            if pandoc.utils.stringify(YAML_VARS[block.classes[1]]) == 'hide' then
                 return {}
-            elseif YAML_VARS[block.classes[1]][1].c == 'print' then
+            elseif pandoc.utils.stringify(YAML_VARS[block.classes[1]]) == 'print' then
                 return block.content
             end
         end
@@ -644,21 +704,31 @@ function handleBlocks(block)
             if block.classes[1] == "box" then
                 BOX_USED = true
             end
-            prefix = pandoc.Plain({LATEX_TEXT["block_" .. block.classes[1]].Open})
-            postfix = pandoc.Plain({LATEX_TEXT["block_" .. block.classes[1]].Close})
-            return {prefix} .. block.content .. {postfix}
+            -- FIXME: I have problems with the nesting of comments in LaTeX,
+            -- which requires constantly refreshing the existing colors in
+            -- nested block or inline contexts. Perhaps what I should do is
+            -- take block.content and run it through further Block and Inline
+            -- filters, keeping track of colors and applying them as
+            -- appropriate.
+            return
+                {pandoc.Plain({LATEX_TEXT["block_" .. block.classes[1]].Open})} ..
+                block.content ..
+                {pandoc.Plain({LATEX_TEXT["block_" .. block.classes[1]].Close})}
         elseif isHTML(FORMAT) then
-            prefix = pandoc.Plain({HTML_TEXT["block_" .. block.classes[1]].Open})
-            postfix = pandoc.Plain({HTML_TEXT["block_" .. block.classes[1]].Close})
-            return {prefix} .. block.content .. {postfix}
+            return
+                {pandoc.Plain({HTML_TEXT["block_" .. block.classes[1]].Open})} ..
+                block.content ..
+                {pandoc.Plain({HTML_TEXT["block_" .. block.classes[1]].Close})}
         elseif FORMAT == "revealjs" then
-            prefix = pandoc.Plain({HTML_TEXT["block_" .. block.classes[1]].Open})
-            postfix = pandoc.Plain({HTML_TEXT["block_" .. block.classes[1]].Close})
-            return {prefix} .. block.content .. {postfix}
+            return
+                {pandoc.Plain({HTML_TEXT["block_" .. block.classes[1]].Open})} ..
+                block.content ..
+                {pandoc.Plain({HTML_TEXT["block_" .. block.classes[1]].Close})}
         elseif FORMAT == "docx" then
-            prefix = pandoc.Plain({DOCX_TEXT["block_" .. block.classes[1]].Open})
-            postfix = pandoc.Plain({DOCX_TEXT["block_" .. block.classes[1]].Close})
-            return {prefix} .. block.content .. {postfix}
+            return
+                {pandoc.Plain({DOCX_TEXT["block_" .. block.classes[1]].Open})} ..
+                block.content ..
+                {pandoc.Plain({DOCX_TEXT["block_" .. block.classes[1]].Close})}
         end
     end
 end
@@ -683,28 +753,32 @@ function handleInlines(span)
     if spanType == "comment" or spanType == "margin" or
             spanType == "fixme" or spanType == "highlight" then
         -- Process comments ...
-        if YAML_VARS[spanType][1].c == 'hide' then
+        if pandoc.utils.stringify(YAML_VARS[spanType]) == 'hide' then
             return {}
-        elseif YAML_VARS[spanType][1].c == 'print' then
+        elseif pandoc.utils.stringify(YAML_VARS[spanType]) == 'print' then
             return span.content
         end
         -- In this case, we want to print with draft markup
         if isLaTeX(FORMAT) then
-            local prefix = {LATEX_TEXT[spanType].Open}
-            local postfix = {LATEX_TEXT[spanType].Close}
-            return prefix .. span.content .. postfix
+            return
+                {LATEX_TEXT[spanType].Open} ..
+                span.content ..
+                {LATEX_TEXT[spanType].Close}
         elseif isHTML(FORMAT) then
-            local prefix = {HTML_TEXT[spanType].Open}
-            local postfix = {HTML_TEXT[spanType].Close}
-            return prefix .. span.content .. postfix
+            return
+                {HTML_TEXT[spanType].Open} ..
+                span.content ..
+                {HTML_TEXT[spanType].Close}
         elseif FORMAT == "revealjs" then
-            local prefix = {REVEALJS_TEXT[spanType].Open}
-            local postfix = {REVEALJS_TEXT[spanType].Close}
-            return prefix .. span.content .. postfix
+            return
+                {REVEALJS_TEXT[spanType].Open} ..
+                span.content ..
+                {REVEALJS_TEXT[spanType].Close}
         elseif FORMAT == "docx" then
-            local prefix = {DOCX_TEXT[spanType].Open}
-            local postfix = {DOCX_TEXT[spanType].Close}
-            return prefix .. span.content .. postfix
+            return
+                {DOCX_TEXT[spanType].Open} ..
+                span.content ..
+                {DOCX_TEXT[spanType].Close}
         end
     elseif spanType == "smcaps" then
         return pandoc.SmallCaps(span.content)
@@ -719,21 +793,25 @@ function handleInlines(span)
         -- Process cross-references ...
         content = pandoc.utils.stringify(span.content)
         if isLaTeX(FORMAT) then
-            local prefix = LATEX_TEXT[spanType].Open
-            local postfix = LATEX_TEXT[spanType].Close
-            return {latex(prefix .. content .. postfix)}
+            return {latex(
+                LATEX_TEXT[spanType].Open ..
+                content ..
+                LATEX_TEXT[spanType].Close)}
         elseif isHTML(FORMAT) then
-            local prefix = HTML_TEXT[spanType].Open
-            local postfix = HTML_TEXT[spanType].Close
-            return {html(prefix .. content .. postfix)}
+            return {html(
+                HTML_TEXT[spanType].Open ..
+                content ..
+                HTML_TEXT[spanType].Close)}
         elseif FORMAT == "revealjs" then
-            local prefix = REVEALJS_TEXT[spanType].Open
-            local postfix = REVEALJS_TEXT[spanType].Close
-            return {html(prefix .. content .. postfix)}
+            return {html(
+                REVEALJS_TEXT[spanType].Open ..
+                content ..
+                REVEALJS_TEXT[spanType].Close)}
         elseif FORMAT == "docx" then
-            local prefix = DOCX_TEXT[spanType].Open
-            local postfix = DOCX_TEXT[spanType].Close
-            return {docx(prefix .. content .. postfix)}
+            return {docx(
+                DOCX_TEXT[spanType].Open ..
+                content ..
+                DOCX_TEXT[spanType].Close)}
         end
     end
 end
@@ -764,8 +842,8 @@ local COMMENT_FILTER = {
     {Para = handleTransclusion},  -- Transclusion before other filters
     {Para = handleNoIndent},      -- Non-indented paragraphs (after transclusion)
     {CodeBlock = handleCode},     -- Convert TikZ images (before Image)
+    {Div = handleBlocks},         -- Comment blocks (before inlines)
     {Image = handleImages},       -- Images (so captions get inline filters)
-    {Div = handleBlocks},         -- Comment blocks
     {Math = handleMacros},        -- Replace macros from YAML data
     {Span = handleInlines},       -- Comment and cross-ref inlines
     {Note = handleNotes},         -- Count words
