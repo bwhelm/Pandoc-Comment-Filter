@@ -160,23 +160,8 @@ local IMAGE_PATH = HOME_PATH .. '/tmp/pandoc/Figures/'
 local DEFAULT_FONT = 'fbb'
 
 
-function isCommentBlock(text)
-    return text == 'comment' or text == 'box' or text == 'center' or text == 'speaker'
-end
-
-
-function html(text)
-    return pandoc.RawInline("html", text)
-end
-
-
 function latex(text)
     return pandoc.RawInline("latex", text)
-end
-
-
-function docx(text)
-    return pandoc.RawInline("openxml", text)
 end
 
 
@@ -226,6 +211,10 @@ LATEX_TEXT.r.Close = '}'
 LATEX_TEXT.rp = {}
 LATEX_TEXT.rp.Open = '\\cpageref{'
 LATEX_TEXT.rp.Close = '}'
+
+function html(text)
+    return pandoc.RawInline("html", text)
+end
 
 local HTML_TEXT = {}
 HTML_TEXT.block_comment = {}
@@ -312,6 +301,10 @@ REVEALJS_TEXT.rp = {}
 REVEALJS_TEXT.rp.Open = '<a href="#'
 REVEALJS_TEXT.rp.Close = '">here</a>'
 
+function docx(text)
+    return pandoc.RawInline("openxml", text)
+end
+
 local DOCX_TEXT = {}
 DOCX_TEXT.block_comment = {}
 DOCX_TEXT.block_comment.Open = docx('')
@@ -364,16 +357,24 @@ local NOTE_COUNT = 0
 local YAML_WORDS = 0 -- Used for counting # words in YAML values (to be subtracted)
 
 -- Used to specify whether to print various note types in draft.
-local COMMENT = true
-local FIXME = true
-local MARGIN = true
-local HIGHLIGHT = true
+local COMMENT_DEFAULT   = pandoc.MetaInlines({pandoc.Str('hide')})
+local MARGIN_DEFAULT    = pandoc.MetaInlines({pandoc.Str('hide')})
+local FIXME_DEFAULT     = pandoc.MetaInlines({pandoc.Str('print')})
+local HIGHLIGHT_DEFAULT = pandoc.MetaInlines({pandoc.Str('print')})
+local SPEAKER_DEFAULT   = pandoc.MetaInlines({pandoc.Str('draft')})
+
 
 -- FIXME: Used to keep track of current colors for blocks and inlines for LaTeX
 -- ... I'm not sure this is going to work, unless I can determine when the
 -- block or inline ends.
-local CURRENT_BLOCK_COLOR = nil
-local CURRENT_INLINE_COLOR = nil
+-- local CURRENT_BLOCK_COLOR = nil
+-- local CURRENT_INLINE_COLOR = nil
+
+
+function isCommentBlock(text)
+    return text == 'comment' or text == 'box' or text == 'center' or
+                   text == 'speaker'
+end
 
 
 function isHTML(format)
@@ -452,11 +453,11 @@ function getYAML(meta)
         YAML_VARS.highlight = YAML_VARS.highlight or pandoc.MetaInlines({pandoc.Str('draft')})
         YAML_VARS.speaker   = YAML_VARS.speaker   or pandoc.MetaInlines({pandoc.Str('draft')})
     else
-        YAML_VARS.comment   = YAML_VARS.comment   or pandoc.MetaInlines({pandoc.Str('hide')})
-        YAML_VARS.margin    = YAML_VARS.margin    or pandoc.MetaInlines({pandoc.Str('hide')})
-        YAML_VARS.fixme     = YAML_VARS.fixme     or pandoc.MetaInlines({pandoc.Str('print')})
-        YAML_VARS.highlight = YAML_VARS.highlight or pandoc.MetaInlines({pandoc.Str('print')})
-        YAML_VARS.speaker   = YAML_VARS.speaker   or pandoc.MetaInlines({pandoc.Str('draft')})
+        YAML_VARS.comment   = YAML_VARS.comment   or COMMENT_DEFAULT
+        YAML_VARS.margin    = YAML_VARS.margin    or MARGIN_DEFAULT
+        YAML_VARS.fixme     = YAML_VARS.fixme     or FIXME_DEFAULT
+        YAML_VARS.highlight = YAML_VARS.highlight or HIGHLIGHT_DEFAULT
+        YAML_VARS.speaker   = YAML_VARS.speaker   or SPEAKER_DEFAULT
     end
 end
 

@@ -1,0 +1,60 @@
+<h1 id="file-transclusion">File Transclusion</h1>
+<p>This is a <em>transcluded</em> file, with <span style="color: red;">comment</span> and <mark>highlighting</mark> and <span style="color: cyan; max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;">Fix this!</span><span style="color: cyan;">a fixme</span>.<span style="color: red; max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;">It also has a marginal note.</span></p>
+<h1 id="non-indented-paragraph">Non-Indented Paragraph</h1>
+<ul>
+<li>Bulleted list</li>
+</ul>
+<p style="text-indent: 0px">Non-indented paragraph.
+<h1 id="images">Images</h1>
+<h2 id="online-image">Online Image</h2>
+<div class="figure">
+<img src="/Users/bennett/tmp/pandoc/Figures/440px-Aristotle_Altemps_Inv8575.png" alt="Test caption" class="unnumbered" style="width:40.0%" />
+<p class="caption">Test caption</p>
+</div>
+<p>FIXME: There are problems with arbitrary filenames in LaTeX.</p>
+<h2 id="tikz-image">TikZ Image</h2>
+<div class="figure">
+<img src="/Users/bennett/tmp/pandoc/Figures/6745b0d931647ceb1c504057c37c165015726560.png" title="The title" alt="A caption." id="identifier" style="width:25.0%" />
+<p class="caption">A caption.</p>
+</div>
+<h1 id="block-elements">Block Elements</h1>
+<p>Normal text.</p>
+<div style="color: red;">
+<p>Commented text (red, only in draft). <em>Emphasized</em> and <strong>bold</strong>. <mark>Highlighted.</mark><span style="color: red; max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;">Marginal note</span> And a <span style="color: cyan; max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;">Fix this!</span><span style="color: cyan;">fixme</span>.</p>
+<ul>
+<li>Bulleted lists
+<ol style="list-style-type: decimal">
+<li>Numbered lists</li>
+</ol></li>
+</ul>
+<p style="text-indent: 0px">Non-indented paragraph.
+<div style="border:1px solid black; padding:1.5ex;">
+<p>Boxed paragraph. FIXME: NOTE THAT IT DOES NOT SHOW UP IN RED IN LATEX!</p>
+</div>
+<p>Out of box, still commented.</p>
+</div>
+<p>Now back to normal text.</p>
+<div style="border:1px solid black; padding:1.5ex;">
+<p>More boxed text, out of comment. <span style="color: red;">Commented.</span> <mark>Highlighted.</mark> (Can’t put marginal notes or fixmes in boxed text because of LaTeX limitations.)</p>
+</div>
+<h1 id="macros">Macros</h1>
+<p>Macro: This is the <em>first</em> macro. <mark>Highlighted.</mark> Another: This is the <strong>second</strong> macro. <span style="color: cyan; max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;">Fix this!</span><span style="color: cyan;">With fixme.</span></p>
+<h1 id="inline-elements">Inline Elements</h1>
+<p>Normal <mark>highlighted</mark> <span style="color: red;">commented</span>.<span style="color: red; max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;">Marginal note <mark>highlighted</mark>.</span> <span style="color: cyan; max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;">Fix this!</span><span style="color: cyan;">Fixme text <mark>highlighted</mark> <span style="color: red;">and commented</span> and normal fixme.</span> And <span class="smallcaps">Text In Small Caps</span>.</p>
+<p>FIXME: HIGHLIGHTED TEXT DOES NOT PICK UP TEXT COLOR WHEN NESTED IN HTML! This requires using <code>&lt;mark style=&quot;color: red;&quot;&gt; ... &lt;/mark&gt;</code>.</p>
+<div style="color: red;">
+<p>Commented text.<span style="color: red; max-width:20%; border: 1px solid black; padding: 1ex; margin: 1ex; float:right; font-size: small;">Margin note with <em>emphasis</em> and <mark>highlighted text</mark>. Normal margin.</span> This is <mark>highlighted and <em>italic</em></mark> text. But now should be back to commented text.</p>
+</div>
+<p>And now back to normal once again. Now testing cross-references and index:</p>
+<ul>
+<li>label: (Nothing appears here.)<a name="label"></a></li>
+<li>reference: See <a href="#label">here</a>, on <a href="#label">here</a>.</li>
+<li>footnote reference:<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a> See <a href="#notelabel">here</a>.</li>
+<li>index: (Nothing appears here.)</li>
+</ul>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Here.<a name="notelabel"></a><a href="#fnref1" class="footnote-back">↩</a></p></li>
+</ol>
+</div>

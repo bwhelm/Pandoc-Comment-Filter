@@ -1,0 +1,140 @@
+\hypertarget{file-transclusion}{%
+\section{File Transclusion}\label{file-transclusion}}
+
+This is a \emph{transcluded} file, with \textcolor{red}{comment} and
+\hl{highlighting} and
+\marginpar{\scriptsize{\textcolor{cyan}{Fix this!}}}\textcolor{cyan}{a
+fixme}.\marginpar{\begin{flushleft}\scriptsize{\textcolor{red}{It also
+has a marginal note.}}\end{flushleft}}
+
+\hypertarget{non-indented-paragraph}{%
+\section{Non-Indented Paragraph}\label{non-indented-paragraph}}
+
+\begin{itemize}
+\tightlist
+\item
+  Bulleted list
+\end{itemize}
+
+\noindent{}Non-indented paragraph.
+
+\hypertarget{images}{%
+\section{Images}\label{images}}
+
+\hypertarget{online-image}{%
+\subsection{Online Image}\label{online-image}}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.4\textwidth,height=\textheight]{/Users/bennett/tmp/pandoc/Figures/440px-Aristotle_Altemps_Inv8575.pdf}
+\caption{Test caption}
+\end{figure}
+
+FIXME: There are problems with arbitrary filenames in LaTeX.
+
+\hypertarget{tikz-image}{%
+\subsection{TikZ Image}\label{tikz-image}}
+
+\hypertarget{identifier}{%
+\begin{figure}
+\centering
+\includegraphics[width=0.25\textwidth,height=\textheight]{/Users/bennett/tmp/pandoc/Figures/6745b0d931647ceb1c504057c37c165015726560.pdf}
+\caption{A caption.}\label{identifier}
+\end{figure}
+}
+
+\hypertarget{block-elements}{%
+\section{Block Elements}\label{block-elements}}
+
+Normal text.
+
+\color{red}{}
+
+Commented text (red, only in draft). \emph{Emphasized} and
+\textbf{bold}.
+\hl{Highlighted.}\marginpar{\begin{flushleft}\scriptsize{\textcolor{red}{Marginal
+note}}\end{flushleft}} And a
+\marginpar{\scriptsize{\textcolor{cyan}{Fix this!}}}\textcolor{cyan}{fixme}.
+
+\begin{itemize}
+\tightlist
+\item
+  Bulleted lists
+
+  \begin{enumerate}
+  \def\labelenumi{\arabic{enumi}.}
+  \tightlist
+  \item
+    Numbered lists
+  \end{enumerate}
+\end{itemize}
+
+\noindent{}Non-indented paragraph.
+
+\medskip\begin{mdframed}
+
+Boxed paragraph. FIXME: NOTE THAT IT DOES NOT SHOW UP IN RED IN LATEX!
+
+\end{mdframed}\medskip{}
+
+Out of box, still commented.
+
+\color{black}{}
+
+Now back to normal text.
+
+\medskip\begin{mdframed}
+
+More boxed text, out of comment. \textcolor{red}{Commented.}
+\hl{Highlighted.} (Can't put marginal notes or fixmes in boxed text
+because of LaTeX limitations.)
+
+\end{mdframed}\medskip{}
+
+\hypertarget{macros}{%
+\section{Macros}\label{macros}}
+
+Macro: This is the \emph{first} macro. \hl{Highlighted.} Another: This
+is the \textbf{second} macro.
+\marginpar{\scriptsize{\textcolor{cyan}{Fix this!}}}\textcolor{cyan}{With
+fixme.}
+
+\hypertarget{inline-elements}{%
+\section{Inline Elements}\label{inline-elements}}
+
+Normal \hl{highlighted}
+\textcolor{red}{commented}.\marginpar{\begin{flushleft}\scriptsize{\textcolor{red}{Marginal
+note \hl{highlighted}.}}\end{flushleft}}
+\marginpar{\scriptsize{\textcolor{cyan}{Fix this!}}}\textcolor{cyan}{Fixme
+text \hl{highlighted} \textcolor{red}{and commented} and normal fixme.}
+And \textsc{Text In Small Caps}.
+
+FIXME: HIGHLIGHTED TEXT DOES NOT PICK UP TEXT COLOR WHEN NESTED IN HTML!
+This requires using
+\texttt{\textless{}mark\ style="color:\ red;"\textgreater{}\ ...\ \textless{}/mark\textgreater{}}.
+
+\color{red}{}
+
+Commented
+text.\marginpar{\begin{flushleft}\scriptsize{\textcolor{red}{Margin note
+with \emph{emphasis} and \hl{highlighted text}. Normal
+margin.}}\end{flushleft}} This is \hl{highlighted and \emph{italic}}
+text. But now should be back to commented text.
+
+\color{black}{}
+
+And now back to normal once again. Now testing cross-references and
+index:
+
+\begin{itemize}
+\tightlist
+\item
+  label: (Nothing appears here.)\label{label}
+\item
+  reference: See \cref{label}, on \cpageref{label}.
+\item
+  footnote reference:\footnote{Here.\label{notelabel}} See
+  \cref{notelabel}.
+\item
+  index: (Nothing appears here.)\index{index}
+\end{itemize}
