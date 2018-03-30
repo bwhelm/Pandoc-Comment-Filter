@@ -486,7 +486,7 @@ function setYAML(meta)
             table.insert(meta["header-includes"], pandoc.MetaList(rawInlines))
         end
     end
-    print(string.format("Words:%6d │ Abstract:%4d │ Notes:%5d │ Body:%6d",
+    print(string.format("Words: %d │ Abstract: %d │ Notes: %d │ Body: %d",
           WORD_COUNT - YAML_WORDS + ABSTRACT_COUNT, ABSTRACT_COUNT, NOTE_COUNT,
           WORD_COUNT - NOTE_COUNT - YAML_WORDS))
     return meta
@@ -570,6 +570,12 @@ function handleImages(image)
     local imageFile = image.src
     local imageBaseName, imageExtension
     _, _, imageBaseName, imageExtension = imageFile:find("([^/]*)(%.%a-)$")
+    if imageBaseName == nil then  -- Cannot find file extension
+        print('WARNING: Cannot find extension for ' .. imageFile .. '. Assuming ' .. filetype .. '.')
+        imageBaseName = imageFile
+        imageExtension = filetype
+        imageFile = imageBaseName .. imageExtension
+    end
     if imageFile:find("^https?://") then
         -- It's an online image; need to download to IMAGE_PATH
         imageBaseName = IMAGE_PATH .. imageBaseName
@@ -590,7 +596,15 @@ function handleImages(image)
             convertImage(imageBaseName .. imageExtension, imageBaseName .. filetype)
         end
     else  --Local image.
-        _, _, imageBaseName, imageExtension = imageFile:find("([^/]*)(%.%a-)$")
+        -- Pandoc gives filename with spaces represented by '%20'. Need to
+        -- correct this on both input and output for local files.
+        -- FIXME: Probably need to do this with other special characters!
+        imageFile = string.gsub(imageFile, "%%20", " ")
+        if not fileExists(imageFile) then
+            print('ERROR: Cannot find ' .. imageFile .. '.')
+            return
+        end
+        imageBaseName = string.gsub(imageBaseName, "%%20", "_")
         if imageExtension == ".tex" then
             imageExtension = ".pdf"
             if not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
@@ -598,14 +612,14 @@ function handleImages(image)
             end
             imageFile = IMAGE_PATH .. imageBaseName .. imageExtension
         elseif not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
-            os.execute("cp " .. imageFile .. " " .. IMAGE_PATH ..
-                       imageBaseName .. imageExtension)
+            os.execute('cp "' .. imageFile .. '" "' .. IMAGE_PATH ..
+                       imageBaseName .. imageExtension .. '"')
         end
         imageBaseName = IMAGE_PATH .. imageBaseName
         -- Convert image if necessary....
         if imageExtension ~= filetype and
                 not fileExists(imageBaseName .. filetype) then
-            convertImage(imageFile, imageBaseName .. filetype)
+            convertImage(imageBaseName .. imageExtension, imageBaseName .. filetype)
         end
     end
     local attr = pandoc.Attr(image.identifier, image.classes, image.attributes)
@@ -630,8 +644,7 @@ function tikz2image(tikz, filetype, outfile)
         -- print('-------------------------------------------')
         -- print(mimeType)
     else
-        os.execute("convert -density 300 " ..
-                   tmphead .. ".pdf -quality 100 " .. outfile)
+        convertImage(tmphead .. '.pdf', outfile)
     end
     os.remove(tmphead .. ".tex")
     os.remove(tmphead .. ".pdf")
