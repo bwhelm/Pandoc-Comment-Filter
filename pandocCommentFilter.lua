@@ -611,7 +611,22 @@ function handleImages(image)
                 typeset(IMAGE_PATH, imageFile)
             end
             imageFile = IMAGE_PATH .. imageBaseName .. imageExtension
-        elseif not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
+        elseif fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
+            -- Need to check if original file has been modified more recenttly
+            -- than copied file was updated.
+            local f = io.popen("stat -f %m " .. imageFile)
+            local originalModified = f:read()
+            f:close()
+            f = io.popen("stat -f %m " .. IMAGE_PATH .. imageBaseName ..
+                         imageExtension)
+            local copiedModified = f:read()
+            f:close()
+            if originalModified > copiedModified then
+                os.execute('cp "' .. imageFile .. '" "' .. IMAGE_PATH ..
+                           imageBaseName .. imageExtension .. '"')
+                print('Copied file ' .. imageFile .. '!')
+           end
+        else
             os.execute('cp "' .. imageFile .. '" "' .. IMAGE_PATH ..
                        imageBaseName .. imageExtension .. '"')
         end
