@@ -95,6 +95,8 @@ Here are the defined inlines:
     - `[LABEL]{.rp}`:         create a page reference
     - `[text-for-index]{.i}`: create LaTeX index (`\\index{text-for-index}`)
 
+Note: if putting LaTeX into these spans, must enclose it in code spans
+("`...'"), or it will be omitted.
 
 ## Images:
 
