@@ -100,7 +100,8 @@ Note: if putting LaTeX into these spans, must enclose it in code spans
 
 ## Images:
 
-Allow for TikZ figures in code blocks. They should have the following format:
+1. Allow for TikZ figures in code blocks. They should have the following
+   format:
 
     ~~~ {#identifier .tikz caption='A caption that allows *markdown* markup.' title='The title' tikzlibrary='items,to,go,in,\\usetikzlibrary{}'}
 
@@ -108,9 +109,16 @@ Allow for TikZ figures in code blocks. They should have the following format:
 
     ~~~
 
-Note that the caption can be formatted text in markdown, and can use any inline
-elements from this comment filter.
+    Note that the caption can be formatted text in markdown, and can use any
+    inline elements from this comment filter.
 
+2. Similarly, allow for GraphViz figures in code blocks, in the following format:
+
+    ~~~ {#identifier .dot caption='My caption' title='The title'}
+
+    [dot code]
+
+    ~~~
 
 ## Processing .tex Images
 
@@ -668,25 +676,46 @@ function tikz2image(tikz, filetype, outfile)
 end
 
 
-function handleCode(code)
-    if code.classes[1] == 'tikz' then
-        local font = DEFAULT_FONT
+function dot2image(dot, filetype, outfile)
+    -- Given text of a GraphViz image, create an image of given filetype in
+    -- given location.
+    local tmphead = os.tmpname()
+    local f = io.open(tmphead, 'w')
+    f:write(dot)
+    f:close()
+    os.execute("dot -Tpdf -o " .. tmphead .. ".pdf " .. tmphead)
+    if filetype == '.pdf' then
+        os.rename(tmphead .. ".pdf", outfile)
+    else
+        convertImage(tmphead .. '.pdf', outfile)
+    end
+    os.remove(tmphead)
+    os.remove(tmphead .. ".pdf")
+end
+
+
+function generateImage(code, format)
+    local font = ''
+    if format == 'tikz' then
+        font = DEFAULT_FONT
         if YAML_VARS.fontfamily then
             font = YAML_VARS.fontfamily[1].c
         end
-        local filetype = ".png"
-        if isLaTeX(FORMAT) then
-            filetype = ".pdf"
-        end
-        local outfile = IMAGE_PATH .. pandoc.sha1(code.text .. font) .. filetype
-        local caption = code.attributes.caption or ""
-        local formattedCaption = pandoc.read(caption).blocks
-        if formattedCaption[1] then
-            formattedCaption = formattedCaption[1].c
-        else
-            formattedCaption = {}
-        end
-        if not fileExists(outfile) then
+    end
+    local filetype = ".png"
+    if isLaTeX(FORMAT) then
+        filetype = ".pdf"
+    end
+    local outfile = IMAGE_PATH .. pandoc.sha1(code.text .. font) .. filetype
+    local caption = code.attributes.caption or ""
+    local formattedCaption = pandoc.read(caption).blocks
+    if formattedCaption[1] then
+        formattedCaption = formattedCaption[1].c
+    else
+        formattedCaption = {}
+    end
+    if not fileExists(outfile) then
+        if format == 'tikz' then
             local library = code.attributes.tikzlibrary or ""
             local codeHeader = "\\documentclass{standalone}\n" ..
                                "\\usepackage{" .. font .. "}\n" ..
@@ -697,25 +726,36 @@ function handleCode(code)
             codeHeader = codeHeader .. "\\begin{document}\n"
             local codeFooter = "\n\\end{document}\n"
             tikz2image(codeHeader .. code.text .. codeFooter, filetype, outfile)
-            print('Created image ' .. outfile)
-        else
-            print(outfile .. ' already exists.')
+        elseif format == 'dot' then
+            dot2image(code.text, filetype, outfile)
         end
-        local title = code.attributes.title or ""
-        -- Undocumented "feature" in pandoc: figures (as opposed to inline
-        -- images) are created only if the title starts with "fig:", so this
-        -- adds it if it's not already there. (See
-        -- <https://groups.google.com/d/msg/pandoc-discuss/6GdEFG0N-VA/v3ayZPveEQAJ>.)
-        begin, finish = title:find('fig:')
-        if begin ~= 1 then
-            title = 'fig:' .. title
-        end
-        code.attributes.caption = nil
-        code.attributes.tikzlibrary = nil
-        code.attributes.title = nil
-        code.classes[1] = nil
-        local attr = pandoc.Attr(code.identifier, code.classes, code.attributes)
-        return pandoc.Para({pandoc.Image(formattedCaption, outfile, title, attr)})
+        print('Created image ' .. outfile)
+    else
+        print(outfile .. ' already exists.')
+    end
+    local title = code.attributes.title or ""
+    -- Undocumented "feature" in pandoc: figures (as opposed to inline
+    -- images) are created only if the title starts with "fig:", so this
+    -- adds it if it's not already there. (See
+    -- <https://groups.google.com/d/msg/pandoc-discuss/6GdEFG0N-VA/v3ayZPveEQAJ>.)
+    begin, finish = title:find('fig:')
+    if begin ~= 1 then
+        title = 'fig:' .. title
+    end
+    -- code.attributes.caption = nil
+    -- code.attributes.tikzlibrary = nil
+    -- code.attributes.title = nil
+    -- code.classes[1] = nil
+    local attr = pandoc.Attr(code.identifier, code.classes, code.attributes)
+    return pandoc.Para({pandoc.Image(formattedCaption, outfile, title, attr)})
+end
+
+
+function handleCode(code)
+    if code.classes[1] == 'tikz' then
+        return generateImage(code, 'tikz')
+    elseif code.classes[1] == 'dot' then
+        return generateImage(code, 'dot')
     end
 end
 
