@@ -562,17 +562,25 @@ function convertImage(imageToConvert, convertedImage)
 end
 
 
-function typeset(outputLocation, filehead)
-    os.execute("pdflatex -output-directory " .. outputLocation .. " " .. filehead)
+function typeset(outputLocation, filehead, filetype, codeType)
+    -- filetype is the desired output filetype (`.pdf` or `.png`).
+    if codeType == "dot" then
+        -- Note: outputLocation is the actual file
+        os.execute("dot -T" .. string.sub(filetype, 2) .. " -o " .. outputLocation .. " " .. filehead)
+        print("THERE: " .. outputLocation)
+    elseif codeType == "tex" then
+        -- Note: outputLocation is the directory
+        os.execute("pdflatex -output-directory " .. outputLocation .. " " ..
+            filehead)
+    end
 end
 
 
 function handleImages(image)
     -- This will check if an image is online, and will download it; if it is a
-    -- .tex file, it will typeset it. Having done this, it will convert to the
-    -- proper filetype for desired output.
-    -- pandoc.Image = {{"identifier", "classes", "attributes"}, "caption",
-    -- {"src", "title"}}
+    -- .tex or .dot file, it will typeset it. Having done this, it will convert
+    -- to the proper filetype for desired output. pandoc.Image =
+    -- {{"identifier", "classes", "attributes"}, "caption", {"src", "title"}}
     local filetype = ".png"
     if isLaTeX(FORMAT) then
         filetype = ".pdf"
@@ -618,7 +626,13 @@ function handleImages(image)
         if imageExtension == ".tex" then
             imageExtension = ".pdf"
             if not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
-                typeset(IMAGE_PATH, imageFile)
+                typeset(IMAGE_PATH, imageFile, filetype, "tex")
+            end
+            imageFile = IMAGE_PATH .. imageBaseName .. imageExtension
+        elseif imageExtension == ".dot" then
+            imageExtension = filetype
+            if not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
+                typeset(IMAGE_PATH .. imageBaseName .. imageExtension, imageFile, filetype, "dot")
             end
             imageFile = IMAGE_PATH .. imageBaseName .. imageExtension
         elseif fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
@@ -660,7 +674,7 @@ function tikz2image(tikz, filetype, outfile)
     local f = io.open(tmphead .. ".tex", 'w')
     f:write(tikz)
     f:close()
-    typeset(tmpdir, tmphead)
+    typeset(tmpdir, tmphead, filetype, "tex")
     if filetype == '.pdf' then
         os.rename(tmphead .. ".pdf", outfile)
         -- pandoc.mediabag.insert(tmpdir .. tmphead .. '.pdf', mimeType, contents)
@@ -679,18 +693,18 @@ end
 function dot2image(dot, filetype, outfile)
     -- Given text of a GraphViz image, create an image of given filetype in
     -- given location.
-    local tmphead = os.tmpname()
-    local f = io.open(tmphead, 'w')
+    local tmpfile = os.tmpname()
+    local f = io.open(tmpfile, 'w')
     f:write(dot)
     f:close()
-    os.execute("dot -Tpdf -o " .. tmphead .. ".pdf " .. tmphead)
-    if filetype == '.pdf' then
-        os.rename(tmphead .. ".pdf", outfile)
+    typeset(outfile, tmpfile, filetype, "dot")
+    if filetype ~= '.pdf' then
+        os.rename(tmpfile .. ".pdf", outfile)
     else
-        convertImage(tmphead .. '.pdf', outfile)
+        convertImage(tmpfile .. '.pdf', outfile)
     end
-    os.remove(tmphead)
-    os.remove(tmphead .. ".pdf")
+    os.remove(tmpfile)
+    os.remove(tmpfile .. ".pdf")
 end
 
 
