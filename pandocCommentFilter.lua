@@ -554,6 +554,24 @@ local function fileExists(name)
 end
 
 
+local function imageOutdated(original, imageFile)
+    -- Takes two filepaths and checks to see if original is newer than
+    -- imageFile (if imageFile is outdated). Returns `true` if outdated.
+    local f = io.popen("stat -f %m " .. original)
+    local originalModified = f:read()
+    f:close()
+    f = io.popen("stat -f %m " .. imageFile)
+    local copiedModified = f:read()
+    f:close()
+    if originalModified > copiedModified then
+        print(original .. ' needs to be updated ...')
+        return true
+    end
+    print(original .. ' is current ...')
+    return false
+end
+
+
 function convertImage(imageToConvert, convertedImage)
     -- Converts image to new file format
     print("Converting to " .. convertedImage .. "...")
@@ -567,7 +585,6 @@ function typeset(outputLocation, filehead, filetype, codeType)
     if codeType == "dot" then
         -- Note: outputLocation is the actual file
         os.execute("dot -T" .. string.sub(filetype, 2) .. " -o " .. outputLocation .. " " .. filehead)
-        print("THERE: " .. outputLocation)
     elseif codeType == "tex" then
         -- Note: outputLocation is the directory
         os.execute("pdflatex -output-directory " .. outputLocation .. " " ..
@@ -622,47 +639,39 @@ function handleImages(image)
             print('ERROR: Cannot find ' .. imageFile .. '.')
             return
         end
-        imageBaseName = string.gsub(imageBaseName, "%%20", "_")
+        local newImageExtension = imageExtension
         if imageExtension == ".tex" then
-            imageExtension = ".pdf"
-            if not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
-                typeset(IMAGE_PATH, imageFile, filetype, "tex")
-            end
-            imageFile = IMAGE_PATH .. imageBaseName .. imageExtension
+            -- Update this because typesetting LaTeX produces .pdf
+            newImageExtension = ".pdf"
         elseif imageExtension == ".dot" then
-            imageExtension = filetype
-            if not fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
-                typeset(IMAGE_PATH .. imageBaseName .. imageExtension, imageFile, filetype, "dot")
-            end
-            imageFile = IMAGE_PATH .. imageBaseName .. imageExtension
-        elseif fileExists(IMAGE_PATH .. imageBaseName .. imageExtension) then
-            -- Need to check if original file has been modified more recenttly
-            -- than copied file was updated.
-            local f = io.popen("stat -f %m " .. imageFile)
-            local originalModified = f:read()
-            f:close()
-            f = io.popen("stat -f %m " .. IMAGE_PATH .. imageBaseName ..
-                         imageExtension)
-            local copiedModified = f:read()
-            f:close()
-            if originalModified > copiedModified then
-                os.execute('cp "' .. imageFile .. '" "' .. IMAGE_PATH ..
-                           imageBaseName .. imageExtension .. '"')
-                print('Copied file ' .. imageFile .. '!')
-           end
-        else
-            os.execute('cp "' .. imageFile .. '" "' .. IMAGE_PATH ..
-                       imageBaseName .. imageExtension .. '"')
+            -- dot will automatically produce right image type when typeset
+            newImageExtension = filetype
         end
+        imageBaseName = string.gsub(imageBaseName, "%%20", "_")
+        local newImageFile = IMAGE_PATH .. imageBaseName .. newImageExtension
+        -- Typeset image if necessary, or copy to IMAGE_PATH
+        if not fileExists(newImageFile) or imageOutdated(imageFile,
+                newImageFile) then
+            if imageExtension == ".tex" then  -- i.e., if it's LaTeX file...
+                typeset(IMAGE_PATH, imageFile, filetype, "tex")
+            elseif imageExtension == ".dot" then
+                typeset(newImageFile, imageFile, filetype, "dot")
+            else
+                os.execute('cp "' .. imageFile .. '" "' .. newImageFile .. '"')
+                print('Copied file ' .. imageFile .. '!')
+            end
+        end
+        imageFile = newImageFile
         imageBaseName = IMAGE_PATH .. imageBaseName
         -- Convert image if necessary....
-        if imageExtension ~= filetype and
-                not fileExists(imageBaseName .. filetype) then
-            convertImage(imageBaseName .. imageExtension, imageBaseName .. filetype)
+        if newImageExtension ~= filetype and not fileExists(imageBaseName ..
+                filetype) then
+            convertImage(imageFile, imageBaseName .. filetype)
         end
     end
     local attr = pandoc.Attr(image.identifier, image.classes, image.attributes)
-    return pandoc.Image(image.caption, imageBaseName .. filetype, image.title, attr)
+    return pandoc.Image(image.caption, imageBaseName .. filetype, image.title,
+        attr)
 end
 
 
@@ -748,9 +757,9 @@ function generateImage(code, format)
         print(outfile .. ' already exists.')
     end
     local title = code.attributes.title or ""
-    -- Undocumented "feature" in pandoc: figures (as opposed to inline
-    -- images) are created only if the title starts with "fig:", so this
-    -- adds it if it's not already there. (See
+    -- Undocumented "feature" in pandoc: figures (as opposed to inline images)
+    -- are created only if the title starts with "fig:", so this adds it if
+    -- it's not already there. (See
     -- <https://groups.google.com/d/msg/pandoc-discuss/6GdEFG0N-VA/v3ayZPveEQAJ>.)
     begin, finish = title:find('fig:')
     if begin ~= 1 then
