@@ -341,6 +341,9 @@ DOCX_TEXT.fixme = {}
 DOCX_TEXT.fixme.Open = docx('<w:rPr><w:color w:val="0000FF"/></w:rPr><w:t>')
 DOCX_TEXT.fixme.Close = docx('</w:t>')
 DOCX_TEXT.noindent = docx('')
+DOCX_TEXT.i = {}
+DOCX_TEXT.i.Open = '<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> XE "</w:instrText></w:r><w:r><w:instrText>'
+DOCX_TEXT.i.Close = '</w:instrText></w:r><w:r><w:instrText xml:space="preserve">" </w:instrText></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>'
 DOCX_TEXT.l = {}
 DOCX_TEXT.l.Open = ''
 DOCX_TEXT.l.Close = ''
@@ -877,9 +880,15 @@ function handleInlines(span)
     elseif spanType == "smcaps" then
         return pandoc.SmallCaps(span.content)
     elseif spanType == "i" then
-        -- Process indexing only in LaTeX ...
+        -- Process indexing ...
         if isLaTeX(FORMAT) then
             return {latex("\\index{" .. pandoc.utils.stringify(span) .. "}")}
+        elseif FORMAT == 'docx' then
+            print(span.content)
+            return docx(
+                DOCX_TEXT.i.Open ..
+                pandoc.utils.stringify(span.content) ..
+                DOCX_TEXT.i.Close)
         else
             return {}
         end
