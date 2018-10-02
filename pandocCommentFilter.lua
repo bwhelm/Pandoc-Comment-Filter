@@ -885,9 +885,13 @@ function handleInlines(span)
             return {latex("\\index{" .. pandoc.utils.stringify(span) .. "}")}
         elseif FORMAT == 'docx' then
             print(span.content)
+            local indexItem = pandoc.utils.stringify(span.content)
+            indexItem = string.gsub(indexItem, '!', ':')  -- Subheadings
+            -- Need to do other things here to identify ranges of pages,
+            -- "See" and "See also" cross references, etc.
             return docx(
                 DOCX_TEXT.i.Open ..
-                pandoc.utils.stringify(span.content) ..
+                indexItem ..
                 DOCX_TEXT.i.Close)
         else
             return {}
