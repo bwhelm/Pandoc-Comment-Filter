@@ -561,16 +561,21 @@ local function imageOutdated(original, imageFile)
     -- Takes two filepaths and checks to see if original is newer than
     -- imageFile (if imageFile is outdated). Returns `true` if outdated.
     local f = io.popen("stat -f %m " .. original)
+    print('==================================================')
+    print(original)
     local originalModified = f:read()
+    if originalModified == nil then
+        return true
+    end
     f:close()
     f = io.popen("stat -f %m " .. imageFile)
     local copiedModified = f:read()
     f:close()
     if originalModified > copiedModified then
-        print(original .. ' needs to be updated ...')
+        print('  ... needs to be updated ...')
         return true
     end
-    print(original .. ' is current ...')
+    print('  ... is current ...')
     return false
 end
 
@@ -660,7 +665,7 @@ function handleImages(image)
             elseif imageExtension == ".dot" then
                 typeset(newImageFile, imageFile, filetype, "dot")
             else
-                os.execute('cp "' .. imageFile .. '" "' .. newImageFile .. '"')
+                os.rename(imageFile, newImageFile)
                 print('Copied file ' .. imageFile .. '!')
             end
         end
