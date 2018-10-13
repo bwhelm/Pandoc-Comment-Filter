@@ -562,8 +562,6 @@ local function imageOutdated(original, imageFile)
     -- imageFile (if imageFile is outdated). Returns `true` if outdated.
     local f = io.popen('stat -f %m "' .. original .. '"')
     -- local f = io.popen('stat -f %m ' .. original)
-    print('==================================================')
-    print(original)
     local originalModified = f:read()
     if originalModified == nil then
         return true
@@ -572,32 +570,42 @@ local function imageOutdated(original, imageFile)
     f = io.popen('stat -f %m "' .. imageFile .. '"')
     local copiedModified = f:read()
     f:close()
-    if originalModified > copiedModified then
-        print('  ... needs to be updated ...')
+    if originalModified > copiedModified then  -- Need to update....
         return true
+    else  -- Image is current.
+        return false
     end
-    print('  ... is current ...')
-    return false
 end
 
 
 function convertImage(imageToConvert, convertedImage)
     -- Converts image to new file format
-    print("Converting to " .. convertedImage .. "...")
-    os.execute("convert -density 300 " .. imageToConvert ..
-               " -quality 100 " .. convertedImage)
+    if os.execute("convert -density 300 " .. imageToConvert ..
+               " -quality 100 " .. convertedImage) then
+        print('Successfully converted ' .. imageToConvert .. ' to ' ..
+            convertedImage .. '.')
+    else
+        print('ERROR: Could not convert ' .. imageToConvert .. ' to ' ..
+            convertedImage .. '.')
+    end
 end
 
 
 function typeset(outputLocation, filehead, filetype, codeType)
     -- filetype is the desired output filetype (`.pdf` or `.png`).
+    local success = nil
     if codeType == "dot" then
         -- Note: outputLocation is the actual file
-        os.execute("dot -T" .. string.sub(filetype, 2) .. " -o " .. outputLocation .. " " .. filehead)
+        success = os.execute("dot -T" .. string.sub(filetype, 2) .. " -o " .. outputLocation .. " " .. filehead)
     elseif codeType == "tex" then
         -- Note: outputLocation is the directory
-        os.execute("pdflatex -output-directory " .. outputLocation .. " " ..
+        success = os.execute("pdflatex -output-directory " .. outputLocation .. " " ..
             filehead)
+    end
+    if success then
+        print('Successfully typeset ' .. filehead .. '.')
+    else
+        print('ERROR: Could not typeset ' .. filehead .. '.')
     end
 end
 
@@ -628,8 +636,12 @@ function handleImages(image)
         else
             print("Downloading " .. imageFile .. " to " .. imageBaseName ..
                   imageExtension .. ".")
-            os.execute("wget --quiet " .. imageFile .. " --output-document=" ..
-                       imageBaseName .. imageExtension)
+            if os.execute("wget --quiet " .. imageFile .. " --output-document=" ..
+                   imageBaseName .. imageExtension) then
+                print('Successfully downloaded ' .. imageFile .. '.')
+            else
+                print('ERROR: Could not download ' .. imageFile .. '.')
+            end
             -- Because sometimes the downloaded file is old, this prevents it
             -- from being automatically deleted.
             os.execute("touch " .. imageBaseName .. imageExtension)
@@ -666,15 +678,21 @@ function handleImages(image)
             elseif imageExtension == ".dot" then
                 typeset(newImageFile, imageFile, filetype, "dot")
             else
-                os.execute('cp "' .. imageFile .. '" "' .. newImageFile .. '"')
-                print('Copied file ' .. imageFile .. '!')
+                if os.execute('cp -f "' .. imageFile .. '" "' .. newImageFile
+                        .. '"') then
+                    print('Successfully copied file ' .. imageFile .. '.')
+                else
+                    print('ERROR: Could not copy ' .. imageFile .. ' to ' ..
+                        newImageFile .. '.')
+                end
             end
         end
         imageFile = newImageFile
         imageBaseName = IMAGE_PATH .. imageBaseName
         -- Convert image if necessary....
-        if newImageExtension ~= filetype and not fileExists(imageBaseName ..
-                filetype) then
+        if newImageExtension ~= filetype and (not fileExists(imageBaseName ..
+                filetype) or imageOutdated(imageFile, imageBaseName .. filetype))
+                then
             convertImage(imageFile, imageBaseName .. filetype)
         end
     end
