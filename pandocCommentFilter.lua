@@ -560,7 +560,8 @@ end
 local function imageOutdated(original, imageFile)
     -- Takes two filepaths and checks to see if original is newer than
     -- imageFile (if imageFile is outdated). Returns `true` if outdated.
-    local f = io.popen("stat -f %m " .. original)
+    local f = io.popen('stat -f %m "' .. original .. '"')
+    -- local f = io.popen('stat -f %m ' .. original)
     print('==================================================')
     print(original)
     local originalModified = f:read()
@@ -568,7 +569,7 @@ local function imageOutdated(original, imageFile)
         return true
     end
     f:close()
-    f = io.popen("stat -f %m " .. imageFile)
+    f = io.popen('stat -f %m "' .. imageFile .. '"')
     local copiedModified = f:read()
     f:close()
     if originalModified > copiedModified then
@@ -642,7 +643,7 @@ function handleImages(image)
         -- Pandoc gives filename with spaces represented by '%20'. Need to
         -- correct this on both input and output for local files.
         -- FIXME: Probably need to do this with other special characters!
-        imageFile = string.gsub(imageFile, "%%20", " ")
+        imageFile = string.gsub(imageFile, '%%20', ' ')
         if not fileExists(imageFile) then
             print('ERROR: Cannot find ' .. imageFile .. '.')
             return
@@ -665,7 +666,7 @@ function handleImages(image)
             elseif imageExtension == ".dot" then
                 typeset(newImageFile, imageFile, filetype, "dot")
             else
-                os.rename(imageFile, newImageFile)
+                os.execute('cp "' .. imageFile .. '" "' .. newImageFile .. '"')
                 print('Copied file ' .. imageFile .. '!')
             end
         end
