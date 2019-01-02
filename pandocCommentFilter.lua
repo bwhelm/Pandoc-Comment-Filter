@@ -656,6 +656,8 @@ function handleImages(image)
         -- correct this on both input and output for local files.
         -- FIXME: Probably need to do this with other special characters!
         imageFile = string.gsub(imageFile, '%%20', ' ')
+        -- Substitute full path for home directory
+        imageFile = string.gsub(imageFile, '^~/', os.getenv("HOME") .. '/')
         if not fileExists(imageFile) then
             print('ERROR: Cannot find ' .. imageFile .. '.')
             return
