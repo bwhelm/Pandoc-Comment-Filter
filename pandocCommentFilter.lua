@@ -216,10 +216,10 @@ LATEX_TEXT.l = {}
 LATEX_TEXT.l.Open = '\\label{'
 LATEX_TEXT.l.Close = '}'
 LATEX_TEXT.r = {}
-LATEX_TEXT.r.Open = '\\cref{'
+LATEX_TEXT.r.Open = '\\autoref{'
 LATEX_TEXT.r.Close = '}'
 LATEX_TEXT.rp = {}
-LATEX_TEXT.rp.Open = '\\cpageref{'
+LATEX_TEXT.rp.Open = '\\autopageref{'
 LATEX_TEXT.rp.Close = '}'
 
 function html(text)
