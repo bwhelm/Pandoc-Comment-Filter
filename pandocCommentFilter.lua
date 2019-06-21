@@ -46,11 +46,9 @@ Copyright (C) 2017, 2018 Bennett Helm
 
 ## Block-Level Items:
 
-Fenced DIV elements, with `comment`, `box`, `speaker`, and `center` are used
-for creating special blocks. Most are self-explanatory, but `speaker` is used
-for speaker notes in revealjs presentations. Fenced DIV elements take the
-following form , where `comment`, `box`, `speaker` or `center` can fill in for
-`CLASS`:
+Fenced DIV elements, with `comment`, `box`, and `center` are used for creating
+special blocks. Fenced DIV elements take the following form , where `comment`,
+`box`, or `center` can fill in for `CLASS`:
 
     ::: CLASS
     Text of block CLASS item...
@@ -190,10 +188,6 @@ LATEX_TEXT.block_box.Close = latex('\\end{mdframed}\\medskip{}')
 LATEX_TEXT.block_center = {}
 LATEX_TEXT.block_center.Open = latex('\\begin{center}')
 LATEX_TEXT.block_center.Close = latex('\\end{center}')
-LATEX_TEXT.block_speaker = {}  -- Note: treat <!speaker> just like <!comment>
-LATEX_TEXT.block_speaker.Open = latex(string.format('\\textcolor{%s}{',
-                                                    COLORS.block_comment))
-LATEX_TEXT.block_speaker.Close = latex('}')
 LATEX_TEXT.comment = {}
 LATEX_TEXT.comment.Open = latex(string.format('\\textcolor{%s}{',
                                               COLORS.comment))
@@ -238,10 +232,6 @@ HTML_TEXT.block_box.Close = html('</div>')
 HTML_TEXT.block_center = {}
 HTML_TEXT.block_center.Open = html('<div style="text-align:center";>')
 HTML_TEXT.block_center.Close = html('</div>')
-HTML_TEXT.block_speaker = {}  -- Note: treat <!speaker> just like <!comment>
-HTML_TEXT.block_speaker.Open = html(string.format('<div style="color: %s;">',
-                                    COLORS.block_comment))
-HTML_TEXT.block_speaker.Close = html('</div>')
 HTML_TEXT.comment = {}
 HTML_TEXT.comment.Open = html(string.format('<span style="color: %s;">',
                               COLORS.comment))
@@ -281,9 +271,6 @@ REVEALJS_TEXT.block_box.Close = html('</div>')
 REVEALJS_TEXT.block_center = {}
 REVEALJS_TEXT.block_center.Open = html('<div style="text-align:center";>')
 REVEALJS_TEXT.block_center.Close = html('</div>')
-REVEALJS_TEXT.block_speaker = {}
-REVEALJS_TEXT.block_speaker.Open = html('<aside class="notes">')
-REVEALJS_TEXT.block_speaker.Close = html('</aside>')
 REVEALJS_TEXT.comment = {}
 REVEALJS_TEXT.comment.Open = html(string.format('<span style="color: %s;">',
                                   COLORS.comment))
@@ -325,9 +312,6 @@ DOCX_TEXT.block_box.Close = docx('')
 DOCX_TEXT.block_center = {}
 DOCX_TEXT.block_center.Open = docx('')
 DOCX_TEXT.block_center.Close = docx('')
-DOCX_TEXT.block_speaker = {}
-DOCX_TEXT.block_speaker.Open = docx('')
-DOCX_TEXT.block_speaker.Close = docx('')
 DOCX_TEXT.comment = {}
 DOCX_TEXT.comment.Open = docx('<w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>')
 DOCX_TEXT.comment.Close = docx('</w:t>')
@@ -374,7 +358,6 @@ local COMMENT_DEFAULT   = pandoc.MetaInlines({pandoc.Str('hide')})
 local MARGIN_DEFAULT    = pandoc.MetaInlines({pandoc.Str('hide')})
 local FIXME_DEFAULT     = pandoc.MetaInlines({pandoc.Str('print')})
 local HIGHLIGHT_DEFAULT = pandoc.MetaInlines({pandoc.Str('print')})
-local SPEAKER_DEFAULT   = pandoc.MetaInlines({pandoc.Str('draft')})
 
 
 -- FIXME: Used to keep track of current colors for blocks and inlines for LaTeX
@@ -385,8 +368,7 @@ local SPEAKER_DEFAULT   = pandoc.MetaInlines({pandoc.Str('draft')})
 
 
 function isCommentBlock(text)
-    return text == 'comment' or text == 'box' or text == 'center' or
-                   text == 'speaker'
+    return text == 'comment' or text == 'box' or text == 'center'
 end
 
 
@@ -464,13 +446,11 @@ function getYAML(meta)
         YAML_VARS.margin    = YAML_VARS.margin    or pandoc.MetaInlines({pandoc.Str('draft')})
         YAML_VARS.fixme     = YAML_VARS.fixme     or pandoc.MetaInlines({pandoc.Str('draft')})
         YAML_VARS.highlight = YAML_VARS.highlight or pandoc.MetaInlines({pandoc.Str('draft')})
-        YAML_VARS.speaker   = YAML_VARS.speaker   or pandoc.MetaInlines({pandoc.Str('draft')})
     else
         YAML_VARS.comment   = YAML_VARS.comment   or COMMENT_DEFAULT
         YAML_VARS.margin    = YAML_VARS.margin    or MARGIN_DEFAULT
         YAML_VARS.fixme     = YAML_VARS.fixme     or FIXME_DEFAULT
         YAML_VARS.highlight = YAML_VARS.highlight or HIGHLIGHT_DEFAULT
-        YAML_VARS.speaker   = YAML_VARS.speaker   or SPEAKER_DEFAULT
     end
 end
 
@@ -816,7 +796,7 @@ function handleBlocks(block)
     if FORMAT == "markdown" then  -- Don't change anything if translating to .md
         return
     elseif isCommentBlock(block.classes[1]) then
-        if block.classes[1] == "comment" or block.classes[1] == "speaker" then
+        if block.classes[1] == "comment" then
             if pandoc.utils.stringify(YAML_VARS[block.classes[1]]) == 'hide' then
                 return {}
             elseif pandoc.utils.stringify(YAML_VARS[block.classes[1]]) == 'print' then
