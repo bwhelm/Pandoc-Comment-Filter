@@ -695,11 +695,6 @@ function tikz2image(tikz, filetype, outfile)
     typeset(tmpdir, tmphead, filetype, "tex")
     if filetype == '.pdf' then
         os.rename(tmphead .. ".pdf", outfile)
-        -- pandoc.mediabag.insert(tmpdir .. tmphead .. '.pdf', mimeType, contents)
-        -- mimeType, contents =
-        --         pandoc.mediabag.lookup('/Users/bennett/Desktop/dinosaur.jpg')
-        -- print('-------------------------------------------')
-        -- print(mimeType)
     else
         convertImage(tmphead .. '.pdf', outfile)
     end
