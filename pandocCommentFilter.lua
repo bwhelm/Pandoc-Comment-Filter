@@ -486,14 +486,37 @@ function setYAML(meta)
 end
 
 
+local function fileExists(name)
+    -- Returns true/false depending on whether file exists
+    local file = io.open(name, 'r')
+    if file == nil then
+        return false
+    else
+        file:close()
+        return true
+    end
+end
+
+
 function handleTransclusion(para)
     -- Process file transclusion
     if FORMAT == "markdown" then  -- Don't change anything if translating to .md
         return
     elseif #para.content == 2 and
-           para.content[1].text == "@" and
-           para.content[2].t == "Link" then
-        local file = io.open(para.content[2].target, "r")
+            para.content[1].text == "@" and
+            para.content[2].t == "Link" then
+        fileName = para.content[2].target
+        if not fileExists(fileName) then
+            print("ERROR: Cannot find " .. fileName .. "!")
+            return pandoc.Para({
+                pandoc.Math("InlineMath", "\\Longrightarrow"),
+                pandoc.Str(" ERROR: Cannot find "),
+                pandoc.Code(fileName),
+                pandoc.Str("! "),
+                pandoc.Math("InlineMath", "\\Longleftarrow")
+                })
+        end
+        local file = io.open(fileName, "r")
         local text = file:read("*all")
         file:close()
         return pandoc.read(text).blocks
@@ -521,18 +544,6 @@ function handleNoIndent(para)
             return pandoc.Plain({DOCX_TEXT.noindent,
                                 table.unpack(para.content, 3, #para.content)})
         end
-    end
-end
-
-
-local function fileExists(name)
-    -- Returns true/false depending on whether file exists
-    local file = io.open(name, 'r')
-    if file == nil then
-        return false
-    else
-        file:close()
-        return true
     end
 end
 
@@ -640,7 +651,13 @@ function handleImages(image)
         imageFile = string.gsub(imageFile, '^~/', os.getenv("HOME") .. '/')
         if not fileExists(imageFile) then
             print('ERROR: Cannot find ' .. imageFile .. '.')
-            return
+            return {
+                pandoc.Math("InlineMath", "\\Longrightarrow"),
+                pandoc.Str(" ERROR: Cannot find "),
+                pandoc.Code(imageFile),
+                pandoc.Str("! "),
+                pandoc.Math("InlineMath", "\\Longleftarrow")
+                }
         end
         local newImageExtension = imageExtension
         if imageExtension == ".tex" then
