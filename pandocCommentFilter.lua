@@ -126,22 +126,22 @@ from that file, converting it to the appropriate file format for the desired
 output.
 
 
-## Macros:
+-- ## Macros:
 
-Here I abuse math environments to create easy macros.
+-- Here I abuse math environments to create easy macros.
 
-1. In YAML header, specify macros as follows:
+-- 1. In YAML header, specify macros as follows:
 
-    macros:
-    - first: this is the substituted text
-      second: this is more substituted text
+--     macros:
+--     - first: this is the substituted text
+--       second: this is more substituted text
 
-2. Then in text, have users specify macros to be substituted as follows:
+-- 2. Then in text, have users specify macros to be substituted as follows:
 
-    This is my text and $first$. This is more text and $second$.
+--     This is my text and $first$. This is more text and $second$.
 
-As long as the macro labels are not identical to any actual math the user would
-use, there should be no problem.
+-- As long as the macro labels are not identical to any actual math the user would
+-- use, there should be no problem.
 
 ----------------------------------------------------------------------------]]
 
@@ -849,15 +849,15 @@ function handleBlocks(block)
 end
 
 
-function handleMacros(math)
-    if YAML_VARS.macros then
-        for key, value in pairs(YAML_VARS.macros[1]) do
-            if math.text == key then
-                return value
-            end
-        end
-    end
-end
+-- function handleMacros(math)
+--     if YAML_VARS.macros then
+--         for key, value in pairs(YAML_VARS.macros[1]) do
+--             if math.text == key then
+--                 return value
+--             end
+--         end
+--     end
+-- end
 
 
 function handleInlines(span)
@@ -969,7 +969,7 @@ local COMMENT_FILTER = {
     {CodeBlock = handleCode},     -- Convert TikZ images (before Image)
     {Div = handleBlocks},         -- Comment blocks (before inlines)
     {Image = handleImages},       -- Images (so captions get inline filters)
-    {Math = handleMacros},        -- Replace macros from YAML data
+    -- {Math = handleMacros},        -- Replace macros from YAML data
     {Span = handleInlines},       -- Comment and cross-ref inlines
     {Note = handleNotes},         -- Count words
     {Str = handleStrings},        -- Count words
