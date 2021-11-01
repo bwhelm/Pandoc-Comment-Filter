@@ -433,7 +433,7 @@ function getYAML(meta)
                             ABSTRACT_COUNT = ABSTRACT_COUNT + 1
                         -- elseif key == "tempdir" then
                         --     -- Set IMAGE_PATH from metadata
-                        --     IMAGE_PATH = pandoc.utils.stringify(value.c) .. '/Figures/'
+                        --     IMAGE_PATH = pandoc.utils.stringify(value.text) .. '/Figures/'
                         end
                     end
                 end
@@ -743,7 +743,7 @@ function generateImage(code, format)
     if format == 'tikz' then
         font = DEFAULT_FONT
         if YAML_VARS.fontfamily then
-            font = YAML_VARS.fontfamily[1].c
+            font = YAML_VARS.fontfamily[1].text
         end
     end
     local filetype = ".png"
@@ -754,7 +754,7 @@ function generateImage(code, format)
     local caption = code.attributes.caption or ""
     local formattedCaption = pandoc.read(caption).blocks
     if formattedCaption[1] then
-        formattedCaption = formattedCaption[1].c
+        formattedCaption = formattedCaption[1].text
     else
         formattedCaption = {}
     end
@@ -960,6 +960,58 @@ function handleStrings(string)
     return
 end
 
+local inspect = require 'inspect'
+
+function handleQuotes(qstring)
+    -- FIXME: This doesn't handle nested quotes. I think I need to walk the
+    -- inline content of the quote, and assign all subsequent quotes to
+    -- `\enquote{}` rather than `\blockquote{}`, but I can't figure out the
+    -- syntax of it.
+    if isLaTeX(FORMAT) then
+        print(qstring.content[1].text)
+        print(qstring.counter)
+        -- print(inspect(qstring.content))
+        if qstring.level == 1 then
+            table.insert(qstring.content, 1, latex("\\enquote{"))
+        else
+            table.insert(qstring.content, 1, latex("\\blockquote{"))
+        end
+        table.insert(qstring.content, latex("}"))
+        qstring.level = 1
+        value = pandoc.walk_inline(qstring, {Quoted = handleQuotes})
+                -- { Quoted = function(qstring)
+                --     table.remove(qstring.content,1)
+                --     -- table.insert(qstring.content, 1, latex("\\enquote*{"))
+                --     table.insert(qstring.content, 1, latex("\\enquote{"))
+                --     return qstring.content
+                -- end })
+        return value.content
+    else
+        return
+    end
+end
+
+
+function Inlines(inlines)
+    local counter = 0
+    for i = 1, #inlines do
+        if inlines[i] and inlines[i].t == "Quoted" then
+            if inlines[i].content:includes("Quoted", 1) then
+                print(">" .. inlines[i].content[1].text)
+            end
+            -- counter = counter + 1
+            -- print(":" .. inlines[i].content[1].text)
+            -- print(counter)
+            -- -- print(":" .. inspect(inlines[i].content[1]))
+            -- inlines[i].counter = counter
+            -- -- print(inspect(inlines[i]))
+            -- table.insert(inlines[i].content, pandoc.Space())
+            -- table.insert(inlines[i].content, pandoc.Str(tostring(counter)))
+        end
+    end
+    return inlines
+end
+
 
 -- Order matters here!
 local COMMENT_FILTER = {
@@ -968,8 +1020,10 @@ local COMMENT_FILTER = {
     {Para = handleNoIndent},      -- Non-indented paragraphs (after transclusion)
     {CodeBlock = handleCode},     -- Convert TikZ images (before Image)
     {Div = handleBlocks},         -- Comment blocks (before inlines)
+    -- {Inlines = Inlines},
     {Image = handleImages},       -- Images (so captions get inline filters)
     -- {Math = handleMacros},        -- Replace macros from YAML data
+    -- {Quoted = handleQuotes},      -- LaTeX: auto use csquotes' `\blockquote`
     {Span = handleInlines},       -- Comment and cross-ref inlines
     {Note = handleNotes},         -- Count words
     {Str = handleStrings},        -- Count words
