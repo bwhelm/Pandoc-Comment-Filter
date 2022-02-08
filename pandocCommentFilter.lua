@@ -626,9 +626,9 @@ function handleImages(image)
             print(imageFile .. " already exists.")
         else
             print("Downloading " .. imageFile .. " to " .. imageBaseName ..
-                  imageExtension .. ".")
+                imageExtension .. ".")
             if os.execute("wget --quiet " .. imageFile .. " --output-document=" ..
-                   imageBaseName .. imageExtension) then
+                    imageBaseName .. imageExtension) then
                 print('Successfully downloaded ' .. imageFile .. '.')
             else
                 print('ERROR: Could not download ' .. imageFile .. '.')
@@ -648,51 +648,57 @@ function handleImages(image)
         -- FIXME: Probably need to do this with other special characters!
         imageFile = string.gsub(imageFile, '%%20', ' ')
         -- Substitute full path for home directory
-        imageFile = string.gsub(imageFile, '^~/', os.getenv("HOME") .. '/')
-        if not fileExists(imageFile) then
-            print('ERROR: Cannot find ' .. imageFile .. '.')
-            return {
-                pandoc.Math("InlineMath", "\\Longrightarrow"),
-                pandoc.Str(" ERROR: Cannot find "),
-                pandoc.Code(imageFile),
-                pandoc.Str("! "),
-                pandoc.Math("InlineMath", "\\Longleftarrow")
-                }
-        end
-        local newImageExtension = imageExtension
-        if imageExtension == ".tex" then
-            -- Update this because typesetting LaTeX produces .pdf
-            newImageExtension = ".pdf"
-        elseif imageExtension == ".dot" then
-            -- dot will automatically produce right image type when typeset
-            newImageExtension = filetype
-        end
-        imageBaseName = string.gsub(imageBaseName, "%%20", "_")
-        local newImageFile = IMAGE_PATH .. imageBaseName .. newImageExtension
-        -- Typeset image if necessary, or copy to IMAGE_PATH
-        if not fileExists(newImageFile) or imageOutdated(imageFile,
-                newImageFile) then
-            if imageExtension == ".tex" then  -- i.e., if it's LaTeX file...
-                typeset(IMAGE_PATH, imageFile, filetype, "tex")
+        if YAML_VARS.processimage == false then
+            imageBaseName = image.src
+            filetype = ""
+            print("Not processing image " .. imageFile .. ".")
+        else
+            imageFile = string.gsub(imageFile, '^~/', os.getenv("HOME") .. '/')
+            if not fileExists(imageFile) then
+                print('ERROR: Cannot find ' .. imageFile .. '.')
+                return {
+                    pandoc.Math("InlineMath", "\\Longrightarrow"),
+                    pandoc.Str(" ERROR: Cannot find "),
+                    pandoc.Code(imageFile),
+                    pandoc.Str("! "),
+                    pandoc.Math("InlineMath", "\\Longleftarrow")
+                    }
+            end
+            local newImageExtension = imageExtension
+            if imageExtension == ".tex" then
+                -- Update this because typesetting LaTeX produces .pdf
+                newImageExtension = ".pdf"
             elseif imageExtension == ".dot" then
-                typeset(newImageFile, imageFile, filetype, "dot")
-            else
-                if os.execute('cp -f "' .. imageFile .. '" "' .. newImageFile
-                        .. '"') then
-                    print('Successfully copied file ' .. imageFile .. '.')
+                -- dot will automatically produce right image type when typeset
+                newImageExtension = filetype
+            end
+            imageBaseName = string.gsub(imageBaseName, "%%20", "_")
+            local newImageFile = IMAGE_PATH .. imageBaseName .. newImageExtension
+            -- Typeset image if necessary, or copy to IMAGE_PATH
+            if not fileExists(newImageFile) or imageOutdated(imageFile,
+                    newImageFile) then
+                if imageExtension == ".tex" then  -- i.e., if it's LaTeX file...
+                    typeset(IMAGE_PATH, imageFile, filetype, "tex")
+                elseif imageExtension == ".dot" then
+                    typeset(newImageFile, imageFile, filetype, "dot")
                 else
-                    print('ERROR: Could not copy ' .. imageFile .. ' to ' ..
-                        newImageFile .. '.')
+                    if os.execute('cp -f "' .. imageFile .. '" "' .. newImageFile
+                            .. '"') then
+                        print('Successfully copied file ' .. imageFile .. '.')
+                    else
+                        print('ERROR: Could not copy ' .. imageFile .. ' to ' ..
+                            newImageFile .. '.')
+                    end
                 end
             end
-        end
-        imageFile = newImageFile
-        imageBaseName = IMAGE_PATH .. imageBaseName
-        -- Convert image if necessary....
-        if newImageExtension ~= filetype and (not fileExists(imageBaseName ..
-                filetype) or imageOutdated(imageFile, imageBaseName .. filetype))
-                then
-            convertImage(imageFile, imageBaseName .. filetype)
+            imageFile = newImageFile
+            imageBaseName = IMAGE_PATH .. imageBaseName
+            -- Convert image if necessary....
+            if newImageExtension ~= filetype and (not fileExists(imageBaseName ..
+                    filetype) or imageOutdated(imageFile, imageBaseName .. filetype))
+                    then
+                convertImage(imageFile, imageBaseName .. filetype)
+            end
         end
     end
     local attr = pandoc.Attr(image.identifier, image.classes, image.attributes)
