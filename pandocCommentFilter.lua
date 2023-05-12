@@ -966,7 +966,7 @@ function handleStrings(string)
     return
 end
 
-local inspect = require 'inspect'
+-- local inspect = require 'inspect'
 
 function handleQuotes(qstring)
     -- FIXME: This doesn't handle nested quotes. I think I need to walk the
